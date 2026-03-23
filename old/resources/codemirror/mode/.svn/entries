@@ -1,0 +1,124 @@
+10
+
+dir
+21510
+svn+ssh://svn.marklogic.com/project/svnroot/ps/trunk/commercial/consulting/content-analyzer/resources/codemirror/mode
+svn+ssh://svn.marklogic.com/project/svnroot/ps
+
+
+
+2012-01-10T21:27:17.995558Z
+19809
+gvidal
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+6402bce9-75d1-0310-9e43-8e5305d9ef00
+
+ruby
+dir
+
+python
+dir
+
+stex
+dir
+
+php
+dir
+
+plsql
+dir
+
+htmlmixed
+dir
+
+xquery
+dir
+
+velocity
+dir
+
+ntriples
+dir
+
+javascript
+dir
+
+diff
+dir
+
+coffeescript
+dir
+
+jinja2
+dir
+
+lua
+dir
+
+markdown
+dir
+
+haskell
+dir
+
+smalltalk
+dir
+
+groovy
+dir
+
+clike
+dir
+
+css
+dir
+
+xmlpure
+dir
+
+rust
+dir
+
+xml
+dir
+
+r
+dir
+
+perl
+dir
+
+sparql
+dir
+
+yaml
+dir
+
+pascal
+dir
+
+clojure
+dir
+
+scheme
+dir
+
+rst
+dir
+
+tiddlywiki
+dir
+

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/garyv/Workspace/data-insights/**)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(mvn spring-boot:run)",
+      "Bash(where mvn:*)",
+      "Bash(where mvnw:*)",
+      "Bash(java -version)",
+      "Read(//c/Gradle/**)",
+      "Read(//c/Users/garyv/.gradle/**)",
+      "Read(//c/Users/garyv/**)"
+    ]
+  }
+}

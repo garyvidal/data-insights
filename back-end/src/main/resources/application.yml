@@ -1,0 +1,17 @@
+server:
+  port: 8080
+
+marklogic:
+  host: localhost
+  port: 9090 # MarkLogic REST API server port (default 8000)
+  username: admin
+  password: admin
+
+spring:
+  web:
+    resources:
+      add-mappings: false
+
+logging:
+  level:
+    com.datainsights: DEBUG
