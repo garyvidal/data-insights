@@ -10,7 +10,11 @@
       "Bash(java -version)",
       "Read(//c/Gradle/**)",
       "Read(//c/Users/garyv/.gradle/**)",
-      "Read(//c/Users/garyv/**)"
+      "Read(//c/Users/garyv/**)",
+      "Bash(find /c/Users/garyv/Workspace/data-insights/marklogic/src/main/ml-modules/lib -type f \\\\\\(-name *.xqy -o -name *.xql -o -name *.xquery \\\\\\))"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\garyv\\Workspace\\data-insights\\marklogic\\.git"
     ]
   }
 }
