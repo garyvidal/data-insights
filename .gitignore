@@ -1,1 +1,17 @@
 **/node_modules/**
+**/target/**
+**/build/**
+**/dist/**
+**/out/**
+**/coverage/**
+**/.idea/**
+**/.vscode/**
+**/.DS_Store
+**/Thumbs.db
+**/logs/**
+**/tmp/**
+**/temp/**
+**/cache/**
+**/.*.swp
+**/.env
+**/.env.*

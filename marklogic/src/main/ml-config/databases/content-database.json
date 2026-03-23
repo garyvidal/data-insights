@@ -1,0 +1,15 @@
+{
+  "database-name": "%%mlContentDatabaseName%%",
+  "triggers-database": "%%mlTriggersDatabaseName%%",
+  "schema-database": "%%mlSchemasDatabaseName%%",
+  "stemmed-searches": "basic",
+  "word-searches": true,
+  "word-positions": false,
+  "fast-phrase-searches": true,
+  "fast-reverse-searches": true,
+  "triple-index": false,
+  "collection-lexicon": true,
+  "reindexer-enable": true,
+  "range-element-index": [],
+  "range-element-attribute-index": []
+}

@@ -1,0 +1,153 @@
+plugins {
+    id 'com.marklogic.ml-gradle' version '6.2.0'
+}
+
+repositories {
+    mavenCentral()
+}
+
+mlAppConfig {
+    modulePaths = ['src/main/ml-modules']
+}
+
+// ── Load Modules ──────────────────────────────────────────────────────────────
+// Directly uploads lib/ files to the modules database and deploys ext/ files
+// as REST resource extensions — bypasses ml-gradle's broken Gradle 8.x internals.
+tasks.register('loadModules') {
+    group       = 'ml-gradle'
+    description = 'Uploads lib/ modules to the modules database and deploys ext/ REST extensions'
+
+    doLast {
+        def host      = project.property('mlHost')
+        def port      = project.property('mlRestPort') as int
+        def username  = project.property('mlUsername')
+        def password  = project.property('mlPassword')
+        def modulesDb = project.property('mlModulesDatabaseName')
+        def libDir    = file('src/main/ml-modules/lib')
+        def extDir    = file('src/main/ml-modules/ext')
+        def resDir    = file('src/main/ml-modules/resources')
+
+        // Digest auth helper — defined inline so Gradle does not try to serialize it as a bean
+        def digestPut = { String urlStr, byte[] body, String contentType ->
+            def md5 = { String s ->
+                java.security.MessageDigest.getInstance('MD5')
+                    .digest(s.getBytes('UTF-8'))
+                    .collect { String.format('%02x', it & 0xff) }.join()
+            }
+            def parsedUrl = new URL(urlStr)
+            def uri = parsedUrl.path + (parsedUrl.query ? '?' + parsedUrl.query : '')
+
+            def conn = parsedUrl.openConnection() as java.net.HttpURLConnection
+            conn.instanceFollowRedirects = false
+            conn.requestMethod = 'PUT'
+            conn.setRequestProperty('Content-Type', contentType)
+            conn.doOutput = true; conn.outputStream.write(body); conn.outputStream.close()
+
+            def code = conn.responseCode
+            if (code == 401) {
+                def wwwAuth = conn.getHeaderField('WWW-Authenticate') ?: ''
+                conn.errorStream?.close(); conn.disconnect()
+                if (!wwwAuth.startsWith('Digest '))
+                    throw new Exception("Unsupported auth scheme: ${wwwAuth}")
+
+                def params = [:]
+                (wwwAuth =~ /(\w+)="([^"]*)"/).each { _, k, v -> params[k] = v }
+                def realm  = params.realm ?: ''
+                def nonce  = params.nonce ?: ''
+                def qop    = params.qop   ?: ''
+                def nc     = '00000001'
+                def cnonce = UUID.randomUUID().toString().replace('-', '').substring(0, 8)
+                def ha1    = md5("${username}:${realm}:${password}")
+                def ha2    = md5("PUT:${uri}")
+                def resp   = qop ? md5("${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}")
+                                 : md5("${ha1}:${nonce}:${ha2}")
+                def authHeader = "Digest username=\"${username}\", realm=\"${realm}\", " +
+                    "nonce=\"${nonce}\", uri=\"${uri}\", " +
+                    (qop ? "qop=${qop}, nc=${nc}, cnonce=\"${cnonce}\", " : '') +
+                    "response=\"${resp}\""
+
+                conn = parsedUrl.openConnection() as java.net.HttpURLConnection
+                conn.instanceFollowRedirects = false
+                conn.requestMethod = 'PUT'
+                conn.setRequestProperty('Content-Type', contentType)
+                conn.setRequestProperty('Authorization', authHeader)
+                conn.doOutput = true; conn.outputStream.write(body); conn.outputStream.close()
+                code = conn.responseCode
+            }
+            if (code >= 400) {
+                def detail = conn.errorStream?.text ?: '(no detail)'
+                throw new Exception("HTTP ${code} PUT ${urlStr} — ${detail}")
+            }
+        }
+
+        // ── 1. Load lib/ modules into the modules database ────────────────────
+        if (libDir.exists()) {
+            logger.lifecycle('Loading lib/ modules...')
+            libDir.eachFileRecurse { f ->
+                if (!f.isFile() || f.path.contains('.svn')) return
+                def relPath   = libDir.toPath().relativize(f.toPath()).toString().replace('\\', '/')
+                def moduleUri = "/lib/${relPath}"
+                def urlStr    = "http://${host}:${port}/v1/documents?uri=${java.net.URLEncoder.encode(moduleUri, 'UTF-8')}&database=${modulesDb}"
+                logger.lifecycle("  > ${moduleUri}")
+                digestPut(urlStr, f.bytes, 'application/xquery')
+            }
+        }
+        // ── 1b. Load lib/ modules into the modules database ────────────────────
+        if (resDir.exists()) {
+            logger.lifecycle('Loading lib / resources...')
+            resDir.eachFileRecurse { f ->
+                if (!f.isFile() || f.path.contains('.svn')) return
+                def relPath   = libDir.toPath().relativize(f.toPath()).toString().replace('\\', '/')
+                def moduleUri = "/resources/${relPath}"
+                def urlStr    = "http://${host}:${port}/v1/documents?uri=${java.net.URLEncoder.encode(moduleUri, 'UTF-8')}&database=${modulesDb}"
+                logger.lifecycle("  > ${moduleUri}")
+                digestPut(urlStr, f.bytes, 'application/xml')
+            }
+        }
+        // ── 2. Deploy ext/ files as REST resource extensions ──────────────────
+        if (extDir.exists()) {
+            logger.lifecycle('Deploying ext/ REST extensions...')
+            extDir.eachFile { f ->
+                if (!f.name.endsWith('.xqy')) return
+                def resourceName = f.name.replace('.xqy', '')
+                def urlStr       = "http://${host}:${port}/v1/config/resources/${resourceName}"
+                def metaFile     = new File(extDir, "${resourceName}.xml")
+                logger.lifecycle("> ${resourceName}${metaFile.exists() ? ' (with metadata)' : ''}")
+                // Deploy the XQuery source
+                digestPut(urlStr, f.bytes, 'application/xquery')
+                // Deploy the metadata separately as application/xml
+                if (metaFile.exists()) {
+                    digestPut(urlStr, metaFile.bytes, 'application/xml')
+                }
+            }
+        }
+
+        logger.lifecycle('Done.')
+    }
+}
+
+// ── Convenience alias ─────────────────────────────────────────────────────────
+tasks.register('deploy') {
+    group       = 'ml-gradle'
+    description = 'Alias for mlDeploy (creates/updates servers, databases, and loads modules)'
+    dependsOn   'mlDeploy'
+}
+
+// ── Diagnostics ───────────────────────────────────────────────────────────────
+tasks.register('debugModules') {
+    group       = 'ml-gradle'
+    description = 'Prints resolved module paths and files that will be loaded'
+    doLast {
+        def paths = mlAppConfig.modulePaths
+        logger.lifecycle("Configured modulePaths: ${paths}")
+        paths.each { p ->
+            def dir = file(p)
+            logger.lifecycle("  Path '${p}' → ${dir.absolutePath} (exists: ${dir.exists()})")
+            if (dir.exists()) {
+                dir.eachFileRecurse { f ->
+                    if (f.isFile()) logger.lifecycle("    ${f.absolutePath}")
+                }
+            }
+        }
+    }
+}

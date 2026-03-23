@@ -1,0 +1,10 @@
+{
+  "rest-api": {
+    "name": "%%mlAppName%%",
+    "group": "Default",
+    "database": "%%mlContentDatabaseName%%",
+    "modules-database": "%%mlModulesDatabaseName%%",
+    "port": "%%mlRestPort%%",
+    "error-format": "json"
+  }
+}
