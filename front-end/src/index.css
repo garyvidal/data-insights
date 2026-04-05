@@ -6,6 +6,10 @@
   body {
     @apply bg-gray-50 text-gray-900;
   }
+  
+  :root.dark body {
+    @apply bg-gray-950 text-gray-100;
+  }
 }
 
 @layer components {
@@ -15,40 +19,114 @@
   .btn-primary {
     @apply btn bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
   }
+  :root.dark .btn-primary {
+    @apply bg-blue-700 hover:bg-blue-600 focus:ring-blue-400;
+  }
+  
   .btn-secondary {
     @apply btn bg-gray-200 text-gray-800 hover:bg-gray-300 focus:ring-gray-400;
   }
+  :root.dark .btn-secondary {
+    @apply bg-gray-700 text-gray-200 hover:bg-gray-600 focus:ring-gray-500;
+  }
+  
   .btn-danger {
     @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
   }
-  .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4;
+  :root.dark .btn-danger {
+    @apply bg-red-700 hover:bg-red-600 focus:ring-red-400;
   }
+  
+  .card {
+    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-gray-900;
+  }
+  :root.dark .card {
+    @apply bg-gray-900 border-gray-700 shadow-sm text-gray-100;
+  }
+  
   .stat-value {
     @apply text-2xl font-bold text-gray-900;
   }
+  :root.dark .stat-value {
+    @apply text-gray-100;
+  }
+  
   .stat-label {
     @apply text-sm text-gray-500 mt-1;
   }
+  :root.dark .stat-label {
+    @apply text-gray-400;
+  }
+  
   .table-container {
     @apply overflow-auto border border-gray-200 rounded-lg;
   }
+  :root.dark .table-container {
+    @apply border-gray-700;
+  }
+  
   .data-table {
     @apply w-full text-sm text-left border-collapse;
   }
+  :root.dark .data-table {
+    @apply text-gray-200;
+  }
+  
   .data-table thead {
     @apply bg-gray-100 text-gray-600 uppercase text-xs;
   }
+  :root.dark .data-table thead {
+    @apply bg-gray-800 text-gray-300;
+  }
+  
+  .data-table tbody {
+    @apply bg-white;
+  }
+  :root.dark .data-table tbody {
+    @apply bg-gray-900;
+  }
+  
   .data-table th {
     @apply px-4 py-3 font-medium border border-gray-200;
   }
-  .data-table td {
-    @apply px-4 py-2 border border-gray-200;
+  :root.dark .data-table th {
+    @apply border-gray-700;
   }
+  
+  .data-table td {
+    @apply px-4 py-2 border border-gray-200 text-gray-900;
+  }
+  :root.dark .data-table td {
+    @apply border-gray-700 text-gray-200;
+  }
+  
   .data-table tr:hover td {
     @apply bg-blue-50 cursor-pointer;
   }
+  :root.dark .data-table tr:hover td {
+    @apply bg-blue-900;
+  }
+  
   .data-table tr.selected td {
     @apply bg-blue-100;
+  }
+  :root.dark .data-table tr.selected td {
+    @apply bg-blue-800;
+  }
+
+  /* Form elements */
+  input, select, textarea {
+    @apply bg-white text-gray-900;
+  }
+  :root.dark input, 
+  :root.dark select, 
+  :root.dark textarea {
+    @apply bg-gray-800 text-gray-100 border-gray-600;
+  }
+
+  /* Checkbox and radio */
+  input[type="checkbox"],
+  input[type="radio"] {
+    @apply accent-blue-600;
   }
 }

@@ -14,6 +14,7 @@ import AlertDialog from '../components/AlertDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
 import LoadingOverlay from '../components/LoadingOverlay'
 import RunAnalysisModal from '../components/RunAnalysisModal'
+import { SchemaGeneratorModal } from '../components/SchemaGeneratorModal'
 
 type Tab = 'structure'
 
@@ -52,19 +53,19 @@ function TreeRow({
         <div style={{ paddingLeft: depth }} className="flex items-center gap-1">
           {!node.isLeaf && (
             <span
-              className="text-gray-400 cursor-pointer hover:text-blue-500 select-none"
+              className="text-gray-400 dark:text-gray-500 cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 select-none"
               onClick={e => { e.stopPropagation(); onToggle(node.key) }}
             >
               {collapsed ? '▸' : '▾'}
             </span>
           )}
-          {node.isLeaf && <span className="text-gray-300">–</span>}
-          <span className={isAttr ? 'text-purple-600 font-mono text-xs' : 'font-mono text-xs'}>
+          {node.isLeaf && <span className="text-gray-300 dark:text-gray-600">–</span>}
+          <span className={isAttr ? 'text-purple-600 dark:text-purple-400 font-mono text-xs' : 'font-mono text-xs'}>
             {node.localname}
           </span>
         </div>
       </td>
-      <td className="text-xs text-gray-500">{node.inferedTypes}</td>
+      <td className="text-xs text-gray-500 dark:text-gray-400">{node.inferedTypes}</td>
       <td className="text-right text-xs">{node.frequency}</td>
       <td className="text-right text-xs">{node.distinctValues}</td>
       <td className="text-right text-xs">{node.minLength}</td>
@@ -89,6 +90,7 @@ export default function AnalyzePage() {
   const [alert, setAlert] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<{ message: string; onOk: () => void } | null>(null)
   const [showRunModal, setShowRunModal] = useState(false)
+  const [showSchemaModal, setShowSchemaModal] = useState(false)
   const sseRef = useRef<EventSource | null>(null)
   const [rightPanelWidth, setRightPanelWidth] = useState(320)
   const [rightCollapsed, setRightCollapsed] = useState(false)
@@ -258,7 +260,7 @@ export default function AnalyzePage() {
   ]
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950">
       <LoadingOverlay show={loading} message="Loading analysis..." />
       <AlertDialog
         open={!!alert}
@@ -284,14 +286,14 @@ export default function AnalyzePage() {
       )}
 
       {/* Toolbar */}
-      <div className="flex items-center gap-3 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
-        <h2 className="text-lg font-semibold text-gray-900 mr-2">Analyze</h2>
+      <div className="flex items-center gap-3 px-6 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mr-2">Analyze</h2>
 
         {analyses.length > 0 && (
           <select
             value={selectedAnalysis}
             onChange={e => setSelectedAnalysis(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-blue-500"
+            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded px-2 py-1.5 text-sm focus:outline-none focus:border-blue-500"
           >
             {analyses.map(a => (
               <option key={a.analysisId} value={a.analysisId}>
@@ -304,6 +306,12 @@ export default function AnalyzePage() {
         <button className="btn-primary text-sm" onClick={() => setShowRunModal(true)}>
           Run Analysis
         </button>
+
+        {selectedAnalysis && (
+          <button className="btn-primary text-sm" onClick={() => setShowSchemaModal(true)}>
+            Generate Schema
+          </button>
+        )}
 
         {selectedAnalysis && (
           <button className="btn-danger text-sm" onClick={handleDeleteAnalysis}>
@@ -320,7 +328,7 @@ export default function AnalyzePage() {
 
       {/* Doc Stats Bar */}
       {docStats && (
-        <div className="flex gap-6 px-6 py-2 bg-gray-50 border-b text-xs text-gray-600 flex-shrink-0">
+        <div className="flex gap-6 px-6 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400 flex-shrink-0">
           <span>Avg: {fileSizeFormat(docStats.avgDocumentSize)}</span>
           <span>Min: {fileSizeFormat(docStats.minDocumentSize)}</span>
           <span>Max: {fileSizeFormat(docStats.maxDocumentSize)}</span>
@@ -331,17 +339,17 @@ export default function AnalyzePage() {
       {/* Content area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left — Structure tree */}
-        <div className="flex-1 overflow-auto border-r border-gray-200">
+        <div className="flex-1 overflow-auto border-r border-gray-200 dark:border-gray-700">
           {/* Tabs */}
-          <div className="flex border-b border-gray-200 bg-white flex-shrink-0">
+          <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0">
             {tabs.map(t => (
               <button
                 key={t.id}
                 onClick={() => setActiveTab(t.id)}
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === t.id
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}
               >
                 {t.label}
@@ -375,7 +383,7 @@ export default function AnalyzePage() {
                   ))}
                   {nodes.length === 0 && !loading && (
                     <tr>
-                      <td colSpan={6} className="text-center text-gray-400 py-8">
+                      <td colSpan={6} className="text-center text-gray-400 dark:text-gray-500 py-8">
                         {analyses.length === 0
                           ? 'No analyses found. Click "Run Analysis" to start.'
                           : 'No structure data available.'}
@@ -404,7 +412,7 @@ export default function AnalyzePage() {
               <button
                 onClick={() => setRightCollapsed(v => !v)}
                 title={rightCollapsed ? 'Expand panel' : 'Collapse panel'}
-                className="absolute z-20 flex items-center justify-center w-5 h-5 rounded-full bg-white border border-gray-300 text-gray-600 hover:bg-blue-600 hover:text-white hover:border-blue-500 transition-colors shadow-md text-xs"
+                className="absolute z-20 flex items-center justify-center w-5 h-5 rounded-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-blue-600 hover:text-white hover:border-blue-500 transition-colors shadow-md text-xs"
                 style={{ left: rightCollapsed ? '-10px' : '-10px', top: '12px' }}
               >
                 {rightCollapsed ? '‹' : '›'}
@@ -414,19 +422,19 @@ export default function AnalyzePage() {
             {/* Panel content */}
             {!rightCollapsed && (
               <div
-                className="flex-shrink-0 flex flex-col border-l border-gray-200"
+                className="flex-shrink-0 flex flex-col border-l border-gray-200 dark:border-gray-700"
                 style={{ width: rightPanelWidth }}
               >
                 {/* Sub-tabs */}
-                <div className="flex border-b border-gray-200 bg-white flex-shrink-0">
+                <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0">
                   {(['values', 'xpaths', 'uris'] as const).map(tab => (
                     <button
                       key={tab}
                       onClick={() => setRightTab(tab)}
                       className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors capitalize ${
                         rightTab === tab
-                          ? 'border-blue-600 text-blue-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700'
+                          ? 'border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400'
+                          : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                       }`}
                     >
                       {tab === 'xpaths' ? 'XPaths' : tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -468,7 +476,7 @@ export default function AnalyzePage() {
                             ))}
                             {sorted.length === 0 && (
                               <tr>
-                                <td colSpan={2} className="text-center text-gray-400 py-4 text-xs">
+                                <td colSpan={2} className="text-center text-gray-400 dark:text-gray-500 py-4 text-xs">
                                   No values
                                 </td>
                               </tr>
@@ -481,8 +489,8 @@ export default function AnalyzePage() {
 
                   {rightTab === 'xpaths' && (
                     <div className="p-3">
-                      <p className="font-mono text-xs break-all text-gray-800">
-                        {selectedNode.xpath || <span className="text-gray-400">No XPath available</span>}
+                      <p className="font-mono text-xs break-all text-gray-800 dark:text-gray-300">
+                        {selectedNode.xpath || <span className="text-gray-400 dark:text-gray-500">No XPath available</span>}
                       </p>
                     </div>
                   )}
@@ -505,7 +513,7 @@ export default function AnalyzePage() {
                           ))}
                           {(!uris || uris.rows.length === 0) && (
                             <tr>
-                              <td colSpan={2} className="text-center text-gray-400 py-4 text-xs">
+                              <td colSpan={2} className="text-center text-gray-400 dark:text-gray-500 py-4 text-xs">
                                 No URIs
                               </td>
                             </tr>
@@ -518,6 +526,20 @@ export default function AnalyzePage() {
               </div>
             )}
           </div>
+        )}
+
+        {showSchemaModal && (
+          <SchemaGeneratorModal
+            analysisId={selectedAnalysis}
+            database={selectedDb}
+            nodes={nodes}
+            isOpen={showSchemaModal}
+            onClose={() => setShowSchemaModal(false)}
+            onSuccess={(schema) => {
+              setShowSchemaModal(false)
+              setAlert(`✓ Schema generated successfully! Schema ID: ${schema.schemaId}`)
+            }}
+          />
         )}
       </div>
     </div>

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import DatabaseSelector from './DatabaseSelector'
 import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 
 const MIN_WIDTH = 160
 const MAX_WIDTH = 400
@@ -32,15 +33,25 @@ const AnalyzeIcon = () => (
   </svg>
 )
 
+const SchemaIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 11l3 3L22 4" />
+    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    <polyline points="9 6 9 2 15 2" />
+  </svg>
+)
+
 const navItems = [
   { to: '/home', label: 'Home', Icon: HomeIcon },
   { to: '/distribution', label: 'Distribution', Icon: DistributionIcon },
   { to: '/analyze', label: 'Analyze', Icon: AnalyzeIcon },
+  { to: '/schema', label: 'Schema', Icon: SchemaIcon },
   // { to: '/coverage', label: 'Coverage' },
 ]
 
 export default function Layout() {
   const { user, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const [width, setWidth] = useState(DEFAULT_WIDTH)
   const [collapsed, setCollapsed] = useState(false)
@@ -76,10 +87,10 @@ export default function Layout() {
   const effectiveWidth = collapsed ? COLLAPSED_WIDTH : width
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-950 dark:text-gray-100">
       {/* Sidebar */}
       <aside
-        className="flex-shrink-0 bg-gray-900 text-white flex flex-col relative"
+        className="flex-shrink-0 bg-gray-900 dark:bg-gray-950 text-white flex flex-col relative border-r border-gray-700 dark:border-gray-800"
         style={{ width: effectiveWidth, transition: 'width 0.15s ease' }}
       >
         {/* Header */}
@@ -124,26 +135,76 @@ export default function Layout() {
 
 
         {/* User / logout */}
-        <div className={`border-t border-gray-700 ${collapsed ? 'p-2' : 'p-3'}`}>
+        <div className={`border-t border-gray-700 dark:border-gray-800 space-y-1 ${collapsed ? 'p-2' : 'p-3'}`}>
           {collapsed ? (
-            <button
-              onClick={handleLogout}
-              title="Sign out"
-              className="w-full flex items-center justify-center py-1 text-gray-400 hover:text-white transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-            </button>
-          ) : (
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-gray-400 truncate" title={user ?? ''}>{user}</span>
+            <div className="flex flex-col gap-1">
+              <button
+                onClick={toggleTheme}
+                title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+                className="w-full flex items-center justify-center py-1 text-gray-400 hover:text-white transition-colors"
+              >
+                {theme === 'light' ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="1" x2="12" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="23" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                    <line x1="1" y1="12" x2="3" y2="12" />
+                    <line x1="21" y1="12" x2="23" y2="12" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                  </svg>
+                )}
+              </button>
               <button
                 onClick={handleLogout}
                 title="Sign out"
-                className="flex-shrink-0 text-xs text-gray-400 hover:text-white transition-colors"
+                className="w-full flex items-center justify-center py-1 text-gray-400 hover:text-white transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-gray-400 truncate" title={user ?? ''}>{user}</span>
+                <button
+                  onClick={toggleTheme}
+                  title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+                  className="flex-shrink-0 text-xs text-gray-400 hover:text-white transition-colors p-1"
+                >
+                  {theme === 'light' ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="5" />
+                      <line x1="12" y1="1" x2="12" y2="3" />
+                      <line x1="12" y1="21" x2="12" y2="23" />
+                      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                      <line x1="1" y1="12" x2="3" y2="12" />
+                      <line x1="21" y1="12" x2="23" y2="12" />
+                      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              <button
+                onClick={handleLogout}
+                title="Sign out"
+                className="w-full text-xs text-gray-400 hover:text-white transition-colors text-left"
               >
                 Sign out
               </button>
@@ -171,7 +232,7 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950">
         <Outlet />
       </main>
     </div>

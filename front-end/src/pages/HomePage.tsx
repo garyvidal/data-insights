@@ -33,21 +33,21 @@ export default function HomePage() {
   }, [selectedDb])
 
   return (
-    <div className="p-6">
+    <div className="p-6 bg-gray-50 dark:bg-gray-950 min-h-screen">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
           {selectedDb ? `Database: ${selectedDb}` : 'Select a database'}
         </h2>
-        <p className="text-gray-500 text-sm mt-1">Document statistics and analysis overview</p>
+        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Document statistics and analysis overview</p>
       </div>
 
       {loading && (
-        <div className="text-sm text-gray-400 animate-pulse">Loading statistics...</div>
+        <div className="text-sm text-gray-400 dark:text-gray-500 animate-pulse">Loading statistics...</div>
       )}
 
       {stats && (
         <>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+          <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
             Document Counts
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
@@ -62,7 +62,7 @@ export default function HomePage() {
 
       {status && (
         <>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+          <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
             Analysis Status
           </h3>
           <div className="grid grid-cols-2 gap-4 mb-8">

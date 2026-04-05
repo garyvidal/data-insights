@@ -97,3 +97,57 @@ export interface NotificationItem {
   title: string
   message: string
 }
+
+// ── Schema Types ──────────────────────────────────────────────────────────
+
+export interface SchemaGenerationRequest {
+  analysisId: string
+  database: string
+  schemaType: 'json-schema' | 'xsd'
+  strict: boolean
+  name?: string
+}
+
+export interface SchemaGenerationResponse {
+  schemaId: string
+  analysisId: string
+  database: string
+  schemaType: 'json-schema' | 'xsd'
+  schema: string
+  generatedAt: string
+  documentCount: number
+  status: 'success' | 'error' | 'partial'
+  message: string
+}
+
+export interface ValidationError {
+  path: string
+  message: string
+  severity: 'error' | 'warning'
+  code: string
+}
+
+export interface ValidationResult {
+  valid: boolean
+  schemaId: string
+  errors: ValidationError[]
+  warnings: string[]
+  validationTime: number
+}
+
+export interface ValidationRequest {
+  schemaId: string
+  database: string
+  document: string
+  documentType: 'json' | 'xml'
+}
+
+export interface SchemaInfo {
+  schemaId: string
+  name: string
+  schemaType: string
+  analysisId: string
+  database: string
+  documentCount: number
+  createdAt: string
+}

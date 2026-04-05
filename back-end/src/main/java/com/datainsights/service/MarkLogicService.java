@@ -119,7 +119,6 @@ public class MarkLogicService {
     // ── Analysis Data ────────────────────────────────────────────────────────
 
     public String getAnalysisRaw(Map<String, String> params) {
-        // Return raw XML for structure — frontend can request specific types
         return get("/v1/resources/analysis", params);
     }
 
@@ -162,7 +161,7 @@ public class MarkLogicService {
 
     public Map<String, Object> getAnalysisValues(String analysisId, String nodeId, String type, int page, int rows) {
         Map<String, String> params = new LinkedHashMap<>();
-        params.put("rs:type", type); // element-values or attribute-values
+        params.put("rs:type", type);
         params.put("rs:analysis-id", analysisId);
         params.put("rs:id", nodeId);
         params.put("rs:page", String.valueOf(page));

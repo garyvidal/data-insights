@@ -12,6 +12,11 @@ import type {
   RunAnalysisRequest,
   UriRow,
   ValueRow,
+  SchemaGenerationRequest,
+  SchemaGenerationResponse,
+  ValidationRequest,
+  ValidationResult,
+  SchemaInfo,
 } from '../types'
 
 const api = axios.create({ baseURL: '/api', withCredentials: true })
@@ -125,3 +130,49 @@ export const executeQuery = (
 ): Promise<{ valid: boolean; count: string; error: string }> =>
   api.post('/execute-query', { db, query, xpath }).then(r => r.data)
 
+// ── Schema Operations ─────────────────────────────────────────────────────────
+
+export const generateJsonSchema = (
+  request: SchemaGenerationRequest,
+): Promise<SchemaGenerationResponse> =>
+  api.post<SchemaGenerationResponse>('/schema/generate/json-schema', request).then(r => r.data)
+
+export const generateXmlSchema = (
+  request: SchemaGenerationRequest,
+): Promise<SchemaGenerationResponse> =>
+  api.post<SchemaGenerationResponse>('/schema/generate/xsd', request).then(r => r.data)
+
+export const getSchema = (schemaId: string): Promise<string> =>
+  api.get<string>(`/schema/${schemaId}`).then(r => r.data)
+
+export const listSchemas = (database: string): Promise<SchemaInfo[]> =>
+  api.get<SchemaInfo[]>('/schema/list', { params: { database } }).then(r => r.data)
+
+export const deleteSchema = (schemaId: string): Promise<void> =>
+  api.delete(`/schema/${schemaId}`).then(() => undefined)
+
+// ── Validation Operations ─────────────────────────────────────────────────────
+
+export const validateDocument = (request: ValidationRequest): Promise<ValidationResult> =>
+  api.post<ValidationResult>('/schema/validate', request).then(r => r.data)
+
+export const validateBatch = (
+  schemaId: string,
+  documents: string[],
+  documentType?: string,
+): Promise<ValidationResult[]> =>
+  api
+    .post<ValidationResult[]>('/schema/validate/batch', documents, {
+      params: { schemaId, documentType: documentType ?? 'json' },
+    })
+    .then(r => r.data)
+
+export const analyzeAnomalies = (
+  schemaId: string,
+  documents: string[],
+): Promise<Record<string, any>> =>
+  api
+    .post<Record<string, any>>('/schema/analyze-anomalies', documents, {
+      params: { schemaId },
+    })
+    .then(r => r.data)

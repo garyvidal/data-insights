@@ -37,12 +37,12 @@ export default function DistributionPage() {
   const total = elements.reduce((s, e) => s + e.frequency, 0)
 
   return (
-    <div className="p-6">
+    <div className="p-6 bg-gray-50 dark:bg-gray-950 min-h-screen">
       <LoadingOverlay show={loading} message="Loading distribution data..." />
 
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Content Distribution</h2>
-        <p className="text-gray-500 text-sm mt-1">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Content Distribution</h2>
+        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
           {selectedDb} — {total.toLocaleString()} total documents
         </p>
       </div>
@@ -50,7 +50,7 @@ export default function DistributionPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Table */}
         <div className="card">
-          <h3 className="font-semibold text-gray-700 mb-3">Root Elements</h3>
+          <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">Root Elements</h3>
           <div className="table-container max-h-96">
             <table className="data-table">
               <thead>
@@ -68,10 +68,10 @@ export default function DistributionPage() {
                       <span
                         className={`inline-block px-2 py-0.5 text-xs rounded-full font-medium ${
                           el.type === 'element'
-                            ? 'bg-blue-100 text-blue-700'
+                            ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
                             : el.type === 'json'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-gray-100 text-gray-600'
+                              ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                         }`}
                       >
                         {el.type}
@@ -79,14 +79,14 @@ export default function DistributionPage() {
                     </td>
                     <td className="font-mono text-xs">{el.localname}</td>
                     <td className="text-right">{el.frequency.toLocaleString()}</td>
-                    <td className="text-right text-gray-500">
+                    <td className="text-right text-gray-500 dark:text-gray-400">
                       {total > 0 ? ((el.frequency / total) * 100).toFixed(1) : 0}%
                     </td>
                   </tr>
                 ))}
                 {elements.length === 0 && !loading && (
                   <tr>
-                    <td colSpan={4} className="text-center text-gray-400 py-8">
+                    <td colSpan={4} className="text-center text-gray-400 dark:text-gray-500 py-8">
                       No data. Select a database with documents.
                     </td>
                   </tr>
@@ -98,7 +98,7 @@ export default function DistributionPage() {
 
         {/* Chart */}
         <div className="card flex flex-col items-center">
-          <h3 className="font-semibold text-gray-700 mb-3 self-start">Content Distribution</h3>
+          <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-3 self-start">Content Distribution</h3>
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={320}>
               <PieChart>
@@ -118,10 +118,11 @@ export default function DistributionPage() {
                     const RAD = Math.PI / 180
                     const x = cx + (r + 20) * Math.cos(-midAngle * RAD)
                     const y = cy + (r + 20) * Math.sin(-midAngle * RAD)
+                    const isDark = document.documentElement.classList.contains('dark')
                     return (
                       <text
                         x={x} y={y}
-                        fill="#374151"
+                        fill={isDark ? '#d1d5db' : '#374151'}
                         textAnchor={x > cx ? 'start' : 'end'}
                         dominantBaseline="central"
                         fontSize={12}
@@ -139,7 +140,8 @@ export default function DistributionPage() {
                     const y1 = cy + r * Math.sin(-midAngle * RAD)
                     const x2 = cx + (r + 16) * Math.cos(-midAngle * RAD)
                     const y2 = cy + (r + 16) * Math.sin(-midAngle * RAD)
-                    return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#9ca3af" strokeWidth={1} />
+                    const isDark = document.documentElement.classList.contains('dark')
+                    return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={isDark ? '#6b7280' : '#9ca3af'} strokeWidth={1} />
                   }}
                 >
                   {chartData.map((_, index) => (
@@ -148,12 +150,17 @@ export default function DistributionPage() {
                 </Pie>
                 <Tooltip
                   formatter={(value: number) => [value.toLocaleString(), 'Documents']}
+                  contentStyle={{
+                    backgroundColor: document.documentElement.classList.contains('dark') ? '#111827' : '#ffffff',
+                    borderColor: document.documentElement.classList.contains('dark') ? '#374151' : '#d1d5db',
+                    color: document.documentElement.classList.contains('dark') ? '#f3f4f6' : '#000000'
+                  }}
                 />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex items-center justify-center h-64 text-gray-400 text-sm">
+            <div className="flex items-center justify-center h-64 text-gray-400 dark:text-gray-500 text-sm">
               No data to chart
             </div>
           )}
