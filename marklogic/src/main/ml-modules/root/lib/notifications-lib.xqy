@@ -27,15 +27,21 @@ declare function add-notification(
  )
 };
 (:
- : Returns a list 
+ : Returns unread notifications for the current user and marks them as received.
+ : The mark-received step runs in a separate auto-committed update transaction
+ : so this function can safely be called from a GET (query) context.
 :)
 declare function get-notifications()
 {
-   for $n in /notification[user eq xdmp:get-current-user() and received eq ""]
-   let $received := $n/received
-   return
-   (
-     xdmp:node-replace($received,<received>{fn:current-dateTime()}</received>),
-     $n 
-   )
+   let $notifications := /notification[user eq xdmp:get-current-user() and received eq ""]
+   let $_ :=
+     for $n in $notifications
+     let $uri := xdmp:node-uri($n)
+     return xdmp:spawn-function(function() {
+       xdmp:node-replace(
+         doc($uri)/notification/received,
+         <received>{fn:current-dateTime()}</received>
+       )
+     })
+   return $notifications
 };

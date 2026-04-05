@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useDatabase } from '../context/DatabaseContext'
 import {
+  clearAnalyses,
   deleteAnalysis,
   getAnalysisList,
   getAnalysisStructure,
@@ -88,7 +89,7 @@ export default function AnalyzePage() {
   const [alert, setAlert] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<{ message: string; onOk: () => void } | null>(null)
   const [showRunModal, setShowRunModal] = useState(false)
-  const notificationTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const sseRef = useRef<EventSource | null>(null)
   const [rightPanelWidth, setRightPanelWidth] = useState(320)
   const [rightCollapsed, setRightCollapsed] = useState(false)
   const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(new Set())
@@ -138,6 +139,8 @@ export default function AnalyzePage() {
   // Load analysis list whenever DB changes
   useEffect(() => {
     if (!selectedDb) return
+    setAnalyses([])
+    setSelectedAnalysis('')
     setNodes([])
     setSelectedNode(null)
     setDocStats(null)
@@ -203,21 +206,51 @@ export default function AnalyzePage() {
     })
   }
 
-  function startNotificationPolling() {
-    if (notificationTimer.current) clearInterval(notificationTimer.current)
-    let elapsed = 0
-    notificationTimer.current = setInterval(() => {
-      elapsed += 5000
-      if (elapsed > 300_000) clearInterval(notificationTimer.current!) // stop after 5 min
-      getAnalysisList(selectedDb).then(list => {
-        setAnalyses(list)
-        if (list.length > 0 && !selectedAnalysis) setSelectedAnalysis(list[0].analysisId)
-      }).catch(() => {})
-    }, 5000)
+  function handleClearAllAnalyses() {
+    setConfirm({
+      message: `Clear all analyses for "${selectedDb}"? This cannot be undone.`,
+      onOk: () => {
+        clearAnalyses(selectedDb)
+          .then(() => {
+            setAnalyses([])
+            setSelectedAnalysis('')
+            setNodes([])
+            setSelectedNode(null)
+            setDocStats(null)
+          })
+          .catch(() => setAlert('Failed to clear analyses'))
+      },
+    })
+  }
+
+  function startSse(db: string) {
+    if (sseRef.current) {
+      sseRef.current.close()
+      sseRef.current = null
+    }
+
+    const es = new EventSource(`/api/notifications/stream?db=${encodeURIComponent(db)}`)
+    sseRef.current = es
+
+    es.addEventListener('update', (e: MessageEvent) => {
+      const data = JSON.parse(e.data) as { analyses: Analysis[]; complete: boolean }
+      setAnalyses(data.analyses)
+      setSelectedAnalysis(prev => prev || data.analyses[0]?.analysisId || '')
+    })
+
+    es.addEventListener('complete', () => {
+      es.close()
+      sseRef.current = null
+    })
+
+    es.onerror = () => {
+      es.close()
+      sseRef.current = null
+    }
   }
 
   useEffect(() => () => {
-    if (notificationTimer.current) clearInterval(notificationTimer.current)
+    if (sseRef.current) sseRef.current.close()
   }, [])
 
   const tabs: { id: Tab; label: string }[] = [
@@ -245,7 +278,7 @@ export default function AnalyzePage() {
           onStarted={() => {
             setShowRunModal(false)
             setAlert('Analysis started. It will appear in the list when complete.')
-            startNotificationPolling()
+            startSse(selectedDb)
           }}
         />
       )}
@@ -275,6 +308,12 @@ export default function AnalyzePage() {
         {selectedAnalysis && (
           <button className="btn-danger text-sm" onClick={handleDeleteAnalysis}>
             Delete
+          </button>
+        )}
+
+        {analyses.length > 0 && (
+          <button className="btn-danger text-sm" onClick={handleClearAllAnalyses}>
+            Clear All
           </button>
         )}
       </div>

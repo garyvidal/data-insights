@@ -7,7 +7,6 @@ import type {
   DocStats,
   Expression,
   Namespace,
-  NotificationItem,
   PaginatedResult,
   RootElement,
   RunAnalysisRequest,
@@ -15,7 +14,26 @@ import type {
   ValueRow,
 } from '../types'
 
-const api = axios.create({ baseURL: '/api' })
+const api = axios.create({ baseURL: '/api', withCredentials: true })
+
+api.interceptors.response.use(
+  r => r,
+  err => {
+    const message = err.response?.data?.error ?? err.message ?? 'Request failed'
+    return Promise.reject(new Error(message))
+  },
+)
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+export const loginApi = (username: string, password: string): Promise<string> =>
+  api.post<{ username: string }>('/auth/login', { username, password }).then(r => r.data.username)
+
+export const logoutApi = (): Promise<void> =>
+  api.post('/auth/logout').then(() => undefined)
+
+export const getMe = (): Promise<string> =>
+  api.get<{ username: string }>('/auth/me').then(r => r.data.username)
 
 // ── Databases ─────────────────────────────────────────────────────────────────
 
@@ -82,6 +100,9 @@ export const runAnalysis = (request: RunAnalysisRequest): Promise<void> =>
 export const deleteAnalysis = (id: string): Promise<void> =>
   api.delete('/analysis', { params: { id } }).then(() => undefined)
 
+export const clearAnalyses = (db: string): Promise<void> =>
+  api.delete('/analyses', { params: { db } }).then(() => undefined)
+
 export const clearDatabase = (db: string): Promise<void> =>
   api.post('/clear-db', null, { params: { db } }).then(() => undefined)
 
@@ -104,7 +125,3 @@ export const executeQuery = (
 ): Promise<{ valid: boolean; count: string; error: string }> =>
   api.post('/execute-query', { db, query, xpath }).then(r => r.data)
 
-// ── Notifications ─────────────────────────────────────────────────────────────
-
-export const getNotifications = (): Promise<NotificationItem[]> =>
-  api.get<NotificationItem[]>('/notifications').then(r => r.data)

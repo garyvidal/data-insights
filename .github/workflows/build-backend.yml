@@ -1,0 +1,60 @@
+name: Build and Release Backend
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'back-end/**'
+      - '.github/workflows/build-backend.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'back-end/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        java-version: '23'
+        distribution: 'temurin'
+        cache: maven
+    
+    - name: Build with Maven
+      run: mvn -B -f back-end/pom.xml clean package
+      
+    - name: Test with Maven
+      run: mvn -B -f back-end/pom.xml test
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: backend-jar
+        path: back-end/target/*.jar
+        retention-days: 5
+    
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+    
+    - name: Upload release assets
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: back-end/target/*.jar
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

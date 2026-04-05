@@ -28,10 +28,14 @@ public class MarkLogicConfig {
 
     @Bean
     public RestTemplate markLogicRestTemplate() {
+        return createRestTemplate(username, password);
+    }
+
+    public RestTemplate createRestTemplate(String user, String pass) {
         BasicCredentialsProvider credentialsProvider = new BasicCredentialsProvider();
         credentialsProvider.setCredentials(
                 new AuthScope(host, port),
-                new UsernamePasswordCredentials(username, password.toCharArray())
+                new UsernamePasswordCredentials(user, pass.toCharArray())
         );
 
         CloseableHttpClient httpClient = HttpClientBuilder.create()

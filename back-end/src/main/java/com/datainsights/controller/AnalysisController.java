@@ -1,8 +1,12 @@
 package com.datainsights.controller;
 
 import com.datainsights.service.MarkLogicService;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.util.LinkedHashMap;
 
 import java.util.List;
 import java.util.Map;
@@ -109,6 +113,14 @@ public class AnalysisController {
         return ResponseEntity.ok().build();
     }
 
+    // ── Clear All Analyses for a Database ────────────────────────────────────
+
+    @DeleteMapping("/analyses")
+    public ResponseEntity<Void> clearAnalyses(@RequestParam String db) {
+        mlService.clearAnalyses(db);
+        return ResponseEntity.ok().build();
+    }
+
     // ── Clear Database ────────────────────────────────────────────────────────
 
     @PostMapping("/clear-db")
@@ -140,10 +152,48 @@ public class AnalysisController {
                 body.get("db"), body.get("query"), body.get("xpath")));
     }
 
-    // ── Notifications ─────────────────────────────────────────────────────────
+    // ── Notifications (SSE stream) ────────────────────────────────────────────
 
-    @GetMapping("/notifications")
-    public ResponseEntity<List<Map<String, Object>>> getNotifications() {
-        return ResponseEntity.ok(mlService.getNotifications());
+    @GetMapping(value = "/notifications/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamNotifications(@RequestParam String db) {
+        SseEmitter emitter = new SseEmitter(300_000L);
+
+        // Capture the request context from the servlet thread before the virtual thread starts.
+        // Virtual threads do not inherit Spring's ThreadLocal-bound RequestAttributes.
+        org.springframework.web.context.request.RequestAttributes requestAttributes =
+                org.springframework.web.context.request.RequestContextHolder.currentRequestAttributes();
+
+        Thread.ofVirtual().start(() -> {
+            org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(requestAttributes);
+            long start = System.currentTimeMillis();
+            try {
+                while (System.currentTimeMillis() - start < 300_000L) {
+                    List<Map<String, Object>> analyses = mlService.getAnalysisList(db);
+                    Map<String, Object> notifResult = mlService.getNotificationResult();
+
+                    Map<String, Object> payload = new LinkedHashMap<>();
+                    payload.put("analyses", analyses);
+                    payload.put("notifications", notifResult.get("notifications"));
+                    payload.put("complete", notifResult.get("complete"));
+
+                    emitter.send(SseEmitter.event().name("update").data(payload));
+
+                    if (Boolean.TRUE.equals(notifResult.get("complete"))) {
+                        emitter.send(SseEmitter.event().name("complete").data("done"));
+                        emitter.complete();
+                        return;
+                    }
+
+                    Thread.sleep(2000);
+                }
+                emitter.complete();
+            } catch (Exception e) {
+                emitter.completeWithError(e);
+            } finally {
+                org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+            }
+        });
+
+        return emitter;
     }
 }

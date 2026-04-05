@@ -1,8 +1,11 @@
 package com.datainsights.service;
 
 import com.datainsights.config.MarkLogicConfig;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -26,12 +29,27 @@ public class MarkLogicService {
 
     private static final Logger log = LoggerFactory.getLogger(MarkLogicService.class);
 
-    private final RestTemplate restTemplate;
+    private final RestTemplate defaultRestTemplate;
     private final MarkLogicConfig config;
 
+    @Autowired
+    private HttpServletRequest httpRequest;
+
     public MarkLogicService(RestTemplate restTemplate, MarkLogicConfig config) {
-        this.restTemplate = restTemplate;
+        this.defaultRestTemplate = restTemplate;
         this.config = config;
+    }
+
+    private RestTemplate restTemplate() {
+        HttpSession session = httpRequest.getSession(false);
+        if (session != null) {
+            String username = (String) session.getAttribute("ml_username");
+            String password = (String) session.getAttribute("ml_password");
+            if (username != null && password != null) {
+                return config.createRestTemplate(username, password);
+            }
+        }
+        return defaultRestTemplate;
     }
 
     // ── Databases ───────────────────────────────────────────────────────────
@@ -204,6 +222,10 @@ public class MarkLogicService {
         delete("/v1/resources/clear-db", Map.of("rs:db", db));
     }
 
+    public void clearAnalyses(String db) {
+        delete("/v1/resources/clear-analyses", Map.of("rs:db", db));
+    }
+
     // ── Namespaces ────────────────────────────────────────────────────────────
 
     public List<Map<String, Object>> getNamespaces(String analysisId) {
@@ -261,7 +283,7 @@ public class MarkLogicService {
 
     // ── Notifications ─────────────────────────────────────────────────────────
 
-    public List<Map<String, Object>> getNotifications() {
+    public Map<String, Object> getNotificationResult() {
         String xml = get("/v1/resources/notifications", Map.of());
         Document doc = parse(xml);
         List<Map<String, Object>> list = new ArrayList<>();
@@ -274,10 +296,10 @@ public class MarkLogicService {
             list.add(n);
         }
         String status = child(doc.getDocumentElement(), "status");
-        Map<String, Object> wrapper = new LinkedHashMap<>();
-        wrapper.put("notifications", list);
-        wrapper.put("complete", "Complete".equals(status));
-        return list;
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("notifications", list);
+        result.put("complete", "Complete".equals(status));
+        return result;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -288,7 +310,7 @@ public class MarkLogicService {
         params.forEach(builder::queryParam);
         String url = builder.toUriString();
         log.debug("GET {}", url);
-        return restTemplate.getForObject(url, String.class);
+        return restTemplate().getForObject(url, String.class);
     }
 
     private void delete(String path, Map<String, String> params) {
@@ -297,13 +319,13 @@ public class MarkLogicService {
         params.forEach(builder::queryParam);
         String url = builder.toUriString();
         log.debug("DELETE {}", url);
-        restTemplate.delete(url);
+        restTemplate().delete(url);
     }
 
     private String post(String path, MultiValueMap<String, String> form) {
         String url = config.getBaseUrl() + path;
         log.debug("POST {}", url);
-        return restTemplate.postForObject(url, form, String.class);
+        return restTemplate().postForObject(url, form, String.class);
     }
 
     private String postJson(String path, Object body) {
@@ -311,7 +333,7 @@ public class MarkLogicService {
         log.debug("POST JSON {}", url);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        return restTemplate.postForObject(url, new HttpEntity<>(body, headers), String.class);
+        return restTemplate().postForObject(url, new HttpEntity<>(body, headers), String.class);
     }
 
     private Document parse(String xml) {

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import DatabaseSelector from './DatabaseSelector'
+import { useAuth } from '../context/AuthContext'
 
 const MIN_WIDTH = 160
 const MAX_WIDTH = 400
@@ -39,9 +40,16 @@ const navItems = [
 ]
 
 export default function Layout() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const [width, setWidth] = useState(DEFAULT_WIDTH)
   const [collapsed, setCollapsed] = useState(false)
   const dragStart = useRef<{ x: number; w: number } | null>(null)
+
+  async function handleLogout() {
+    await logout()
+    navigate('/login', { replace: true })
+  }
 
   function onResizeMouseDown(e: React.MouseEvent) {
     e.preventDefault()
@@ -114,6 +122,34 @@ export default function Layout() {
         </nav>
 
 
+
+        {/* User / logout */}
+        <div className={`border-t border-gray-700 ${collapsed ? 'p-2' : 'p-3'}`}>
+          {collapsed ? (
+            <button
+              onClick={handleLogout}
+              title="Sign out"
+              className="w-full flex items-center justify-center py-1 text-gray-400 hover:text-white transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </button>
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-gray-400 truncate" title={user ?? ''}>{user}</span>
+              <button
+                onClick={handleLogout}
+                title="Sign out"
+                className="flex-shrink-0 text-xs text-gray-400 hover:text-white transition-colors"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Resize handle */}
         {!collapsed && (

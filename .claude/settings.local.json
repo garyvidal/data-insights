@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm list:*)"
+      "Bash(npm list:*)",
+      "Bash(grep -r \"xdmp:\" /c/Users/garyv/Workspace/data-insights/marklogic/src/main/ml-modules/*.xqy)"
     ]
   }
 }

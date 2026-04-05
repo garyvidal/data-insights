@@ -15,4 +15,4 @@ spring:
 
 logging:
   level:
-    com.datainsights: DEBUG
+    com.datainsights: INFO
