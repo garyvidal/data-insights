@@ -1,3 +1,4 @@
+(:fn:doc("/flows/unmerge-mastering.flow.json"):)
 xquery version "1.0-ml";
 
 declare default function namespace "urn:local";
@@ -6,16 +7,27 @@ declare default element namespace "http://marklogic.com/content-analyzer";
 
 declare namespace a = "urn:local";
 
-
-declare variable $_callback-db as xs:string external;
-declare variable $_database as xs:string  external;
-declare variable $_name as xs:string external;
-declare variable $_root-element external;
-declare variable $_sample as xs:integer external;
-declare variable $_ticket as xs:integer external;
-declare variable $_constraint as xs:string external;
-declare variable $_xpath as xs:string external;
-declare variable $_namespaces as element(namespace-list) external;
+declare variable $_callback-db as xs:string external := "foo";
+declare variable $_database as xs:string  external := "data-insight-content";
+declare variable $_name as xs:string external := "foo";
+declare variable $_root-element as element(root-element) external := <root-element>
+    <type>json</type>
+    <database>data-hub-STAGING</database>
+    <id>caf9b6b99962bf5c2264824231d7a40c</id>
+    <namespace>
+    </namespace>
+    <localname>info</localname>
+    <frequency>2</frequency>
+    <constraint>
+    <cts:and-query xmlns:cts="http://marklogic.com/cts">
+    </cts:and-query>
+    </constraint>
+    </root-element>;
+declare variable $_sample as xs:integer external := 1;
+declare variable $_ticket as xs:integer external := 123;
+declare variable $_constraint as xs:string external := "cts:and-query(())";
+declare variable $_xpath as xs:string external := "";
+declare variable $_namespaces as element(namespace-list)? external :=();
 
 declare variable $NS-LIST := 
     $_namespaces/*:namespace/(*:prefix|*:namespace-uri)/fn:string(fn:normalize-space(.));
@@ -67,51 +79,23 @@ declare variable $NUMERIC_TYPES := ("xs:integer","xs:long","xs:float","xs:decima
 
 declare function a:infer-types($values)
 {
-   let $is_integer  := every $v in $values[fn:not(. eq $EMPTY_VALUE)] satisfies $v castable as xs:integer
-   let $is_float    := every $v in $values[fn:not(. eq $EMPTY_VALUE)] satisfies $v castable as xs:float
-   let $is_double   := every $v in $values[fn:not(. eq $EMPTY_VALUE)] satisfies $v castable as xs:double
-   let $is_decimal  := every $v in $values[fn:not(. eq $EMPTY_VALUE)] satisfies $v castable as xs:decimal
-   let $is_long     := every $v in $values[fn:not(. eq $EMPTY_VALUE)] satisfies $v castable as xs:long 
-   let $is_boolean  := every $v in $values[fn:not(. eq $EMPTY_VALUE)] satisfies $v = ("0","1","true","false","True","False","Yes","No")   
-   
-   let $is_dateTime   := every $v in $values[fn:not(. eq $EMPTY_VALUE)] satisfies $v castable as xs:dateTime
-   let $is_date       := every $v in $values[fn:not(. eq $EMPTY_VALUE)] satisfies $v castable as xs:date
-   let $is_time       := every $v in $values[fn:not(. eq $EMPTY_VALUE)] satisfies $v castable as xs:time 
-   let $is_shortTime  := every $v in $values[fn:not(. eq $EMPTY_VALUE)] satisfies fn:matches($v,"^\d\d:\d\d^")
-   let $sql_dateTime  := every $v in $values[fn:not(. eq $EMPTY_VALUE)] satisfies fn:matches($v,$PATTERN-SQLDATE)
-   
-   (:Do durations:)                                                                             
-   let $is_gYear      := every $v in $values[fn:not(. eq $EMPTY_VALUE)] satisfies $v castable as xs:gYear
-   let $is_gYearMonth := every $v in $values[fn:not(. eq $EMPTY_VALUE)] satisfies $v castable as xs:gYearMonth
-   let $is_gMonth     := every $v in $values[fn:not(. eq $EMPTY_VALUE)] satisfies $v castable as xs:gMonth
-   let $is_gMonthDay  := every $v in $values[fn:not(. eq $EMPTY_VALUE)] satisfies $v castable as xs:gMonthDay
-   let $is_gDay       := every $v in $values[fn:not(. eq $EMPTY_VALUE)] satisfies $v castable as xs:gDay
-   
-   let $is_duration := every $v in $values[fn:not(. eq $EMPTY_VALUE)]   satisfies $v castable as xs:duration
-   
-   let $is_anyUri := every $v in $values satisfies $v castable as xs:anyURI
-   let $is_complex := some $v in $values satisfies $v  eq $COMPLEX_VALUE   
-   let $is_empty := every $v in $values satisfies $v eq $EMPTY_VALUE
-   let $is_mixed := some $v in $values satisfies $v eq $MIXED_VALUE
-   return
-     (
-       if($is_empty)          then $EMPTY_VALUE
-       else if($is_mixed)     then $MIXED_VALUE 
-       else if($is_complex)   then $COMPLEX_VALUE
-       (:Resolve Types:)
-       else if($is_integer)   then "xs:integer"
-       else if($is_float)     then "xs:float"
-       else if($is_double)    then "xs:double"
-       else if($is_decimal)   then "xs:decimal"       
-       else if($is_dateTime)  then "xs:dateTime" 
-       else if($is_date)      then "xs:date" 
-       else if($is_time)      then "xs:time" 
-       else if($is_shortTime) then "sql:shortTime"
-       else if($sql_dateTime) then "sql:dateTime" 
-       else if($is_duration)  then "xs:duration" 
-       else if($is_boolean)   then "xs:boolean"
-       else "xs:string"
-     )
+  let $non-empty := $values[fn:not(. eq $EMPTY_VALUE)]
+  return
+    if      (every $v in $values    satisfies $v eq $EMPTY_VALUE)   then $EMPTY_VALUE
+    else if (some  $v in $values    satisfies $v eq $MIXED_VALUE)   then $MIXED_VALUE
+    else if (some  $v in $values    satisfies $v eq $COMPLEX_VALUE) then $COMPLEX_VALUE
+    else if (every $v in $non-empty satisfies $v castable as xs:integer)  then "xs:integer"
+    else if (every $v in $non-empty satisfies $v castable as xs:decimal)  then "xs:decimal"
+    else if (every $v in $non-empty satisfies $v castable as xs:float)    then "xs:float"
+    else if (every $v in $non-empty satisfies $v castable as xs:double)   then "xs:double"
+    else if (every $v in $non-empty satisfies $v castable as xs:dateTime) then "xs:dateTime"
+    else if (every $v in $non-empty satisfies $v castable as xs:date)     then "xs:date"
+    else if (every $v in $non-empty satisfies $v castable as xs:time)     then "xs:time"
+    else if (every $v in $non-empty satisfies fn:matches($v,"^\d\d:\d\d^"))    then "sql:shortTime"
+    else if (every $v in $non-empty satisfies fn:matches($v,$PATTERN-SQLDATE)) then "sql:dateTime"
+    else if (every $v in $non-empty satisfies $v castable as xs:duration) then "xs:duration"
+    else if (every $v in $non-empty satisfies $v = ("0","1","true","false","True","False","Yes","No")) then "xs:boolean"
+    else "xs:string"
 };
 
 declare function a:analyze($node as node())
@@ -175,13 +159,25 @@ declare function a:analyze-json($objects as node()*) {
   return
     typeswitch($object)
      case document-node() return
-        a:analyze-json($object/node())
+     (:We need to determine if the root is a JSON object or array:)
+      let $_ := 
+        if(fn:node-name($object/node()) eq "object-node") 
+        then 
+          let $obj-key := fn:concat("",$ELEMENT_NS_JOINER,"object") 
+          let $xpath := a:clean-xpath(xdmp:path($object/node()))
+          let $_ := $ELEMENT_FREQUENCY=>map:put($obj-key, ($ELEMENT_FREQUENCY=>map:get($obj-key),0)[1] + 1)
+          return a:analyze-json($object/node())
+        else 
+          let $obj-key := fn:concat("",$ELEMENT_NS_JOINER,"array")
+          return a:analyze-json($object/node())
+      return a:analyze-json($object/node())
      case object-node() | array-node() return
         for $prop at $pos in $object/node()
+        let $log := xdmp:log($prop)
         let $propname := fn:string(fn:name($prop))
         let $prop-key := fn:concat("",$ELEMENT_NS_JOINER,$propname)
         let $propkey  := fn:concat($obj-key,$ELEMENT_CHILD_JOINER,$prop-key)
-        let $xpath := a:clean-xpath(xdmp:path($prop))
+        let $xpath    := a:clean-xpath(xdmp:path($prop))
         let $_ := $ELEMENT_CHILD_FREQUENCY=>map:put($propkey, ($ELEMENT_CHILD_FREQUENCY=>map:get($propkey),0)[1] + 1)
         let $_ := $ELEMENT_CHILD_DISTANCE=>map:put($propkey,($ELEMENT_CHILD_DISTANCE=>map:get($propkey),$pos))
         let $_ := $ELEMENT_CHILD_XPATHS=>map:put($propkey, ($ELEMENT_CHILD_XPATHS=>map:get($propkey),$xpath))
@@ -706,7 +702,7 @@ declare function a:analyze-root(
                 "cts:search(fn:doc(), ",
                 "cts:json-property-scope-query('",
                   $root/localname,"',",
-                xdmp:describe($query,(),()),
+                  xdmp:describe($query,(),()),
                 "), ",
                 $options,
                 ")[1 to " || $_sample|| " ]"
@@ -758,7 +754,7 @@ let $root-document :=
 let $key := xdmp:md5(fn:concat($_root-element/namespace,$_root-element/localname))
 let $uri := fn:concat("/analysis/",$_database,"/",$key,"/", $id,".xml")
 let $root-uri := fn:concat("/root-elements/",$_database,"/",fn:data($root-document/id),".xml")
-return
+return 
 (
     xdmp:eval('
       import module namespace notification = "http://marklogic.com/content-analyzer/notification" at "/lib/notifications-lib.xqy";
@@ -790,7 +786,6 @@ return
     )
     ,$analysis,
     xdmp:log(
-      fn:concat("Started analysis for element(", $_root-element/localname, ") in ", $_database, " database with id: ", $id),
+      fn:concat("Started Completed for element(", $_root-element/localname, ") in ", $_database, " database with id: ", $id),
       "info")
 )
-  

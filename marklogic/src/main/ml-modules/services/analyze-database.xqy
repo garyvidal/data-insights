@@ -41,15 +41,14 @@ declare function post(
                 <database>{xdmp:database($db)}</database>
             </options>
         )/ca:root-elements
-    let $_ := xdmp:log(("before-root-elements::", $root-elements), "info")
     let $root-elements :=
         if ($all = ("on", "true"))
         then $root-elements/ca:root-element
         else $root-elements/ca:root-element[ca:id = $select-ids]
-    let $_ := xdmp:log(("after-root-elements::", $root-elements), "info")
     let $_ :=
         for $re in $root-elements
         let $ticket-id := xdmp:random()
+        let $_ := xdmp:log(("Created Ticket::", $ticket-id), "info")
         let $_ticket :=
             xdmp:eval('
                 declare variable $ticket-id external;

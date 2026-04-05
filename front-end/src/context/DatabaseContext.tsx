@@ -20,14 +20,22 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
     getDatabases()
       .then(dbs => {
         setDatabases(dbs)
-        if (dbs.length > 0) setSelectedDb(dbs[0])
+        if (dbs.length > 0) {
+          const saved = localStorage.getItem('selectedDb')
+          setSelectedDb(saved && dbs.includes(saved) ? saved : dbs[0])
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
 
+  function setSelectedDbPersisted(db: string) {
+    localStorage.setItem('selectedDb', db)
+    setSelectedDb(db)
+  }
+
   return (
-    <DatabaseContext.Provider value={{ databases, selectedDb, setSelectedDb, loading }}>
+    <DatabaseContext.Provider value={{ databases, selectedDb, setSelectedDb: setSelectedDbPersisted, loading }}>
       {children}
     </DatabaseContext.Provider>
   )

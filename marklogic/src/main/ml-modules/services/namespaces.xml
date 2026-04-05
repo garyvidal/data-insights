@@ -1,0 +1,14 @@
+<rapi:metadata xmlns:rapi="http://marklogic.com/rest-api">
+  <rapi:title>namespaces</rapi:title>
+  <rapi:version>1.0</rapi:version>
+  <rapi:methods>
+    <rapi:method>
+      <rapi:method-name>GET</rapi:method-name>
+      <rapi:parameter>
+        <rapi:parameter-name>id</rapi:parameter-name>
+        <rapi:parameter-type>string</rapi:parameter-type>
+        <rapi:parameter-required>true</rapi:parameter-required>
+      </rapi:parameter>
+    </rapi:method>
+  </rapi:methods>
+</rapi:metadata>

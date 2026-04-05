@@ -7,11 +7,35 @@ const MAX_WIDTH = 400
 const DEFAULT_WIDTH = 224
 const COLLAPSED_WIDTH = 48
 
+const HomeIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    <polyline points="9 22 9 12 15 12 15 22" />
+  </svg>
+)
+
+const DistributionIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="20" x2="18" y2="10" />
+    <line x1="12" y1="20" x2="12" y2="4" />
+    <line x1="6" y1="20" x2="6" y2="14" />
+  </svg>
+)
+
+const AnalyzeIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    <line x1="11" y1="8" x2="11" y2="14" />
+    <line x1="8" y1="11" x2="14" y2="11" />
+  </svg>
+)
+
 const navItems = [
-  { to: '/home', label: 'Home' },
-  { to: '/distribution', label: 'Distribution' },
-  { to: '/analyze', label: 'Analyze' },
-  { to: '/coverage', label: 'Coverage' },
+  { to: '/home', label: 'Home', Icon: HomeIcon },
+  { to: '/distribution', label: 'Distribution', Icon: DistributionIcon },
+  { to: '/analyze', label: 'Analyze', Icon: AnalyzeIcon },
+  // { to: '/coverage', label: 'Coverage' },
 ]
 
 export default function Layout() {
@@ -68,13 +92,13 @@ export default function Layout() {
         )}
         {/* Nav */}
         <nav className="flex-1 p-2 space-y-1 overflow-hidden">
-          {navItems.map(item => (
+          {navItems.map(({ to, label, Icon }) => (
             <NavLink
-              key={item.to}
-              to={item.to}
-              title={item.label}
+              key={to}
+              to={to}
+              title={label}
               className={({ isActive }) =>
-                `flex items-center rounded-md text-sm font-medium transition-colors overflow-hidden whitespace-nowrap ${
+                `flex items-center gap-2 rounded-md text-sm font-medium transition-colors overflow-hidden whitespace-nowrap ${
                   collapsed ? 'justify-center px-1 py-2' : 'px-3 py-2'
                 } ${
                   isActive
@@ -83,11 +107,8 @@ export default function Layout() {
                 }`
               }
             >
-              {collapsed ? (
-                <span className="font-bold text-xs">{item.label[0]}</span>
-              ) : (
-                item.label
-              )}
+              <Icon />
+              {!collapsed && label}
             </NavLink>
           ))}
         </nav>

@@ -4,7 +4,7 @@ import Layout from './components/Layout'
 import HomePage from './pages/HomePage'
 import DistributionPage from './pages/DistributionPage'
 import AnalyzePage from './pages/AnalyzePage'
-import CoveragePage from './pages/CoveragePage'
+// import CoveragePage from './pages/CoveragePage'
 
 export default function App() {
   return (
@@ -16,7 +16,7 @@ export default function App() {
             <Route path="home" element={<HomePage />} />
             <Route path="distribution" element={<DistributionPage />} />
             <Route path="analyze" element={<AnalyzePage />} />
-            <Route path="coverage" element={<CoveragePage />} />
+            {/* <Route path="coverage" element={<CoveragePage />} /> */}
           </Route>
         </Routes>
       </DatabaseProvider>

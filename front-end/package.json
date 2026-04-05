@@ -9,21 +9,24 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/legacy-modes": "^6.5.2",
+    "@tanstack/react-table": "^8.20.5",
+    "@uiw/react-codemirror": "^4.25.9",
+    "axios": "^1.7.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2",
-    "axios": "^1.7.7",
-    "recharts": "^2.13.0",
-    "@tanstack/react-table": "^8.20.5"
+    "recharts": "^2.13.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.2",
-    "typescript": "^5.6.3",
-    "vite": "^5.4.9",
-    "tailwindcss": "^3.4.14",
     "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.47"
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.9"
   }
 }

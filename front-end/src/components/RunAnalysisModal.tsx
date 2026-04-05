@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { getRootElements, runAnalysis } from '../services/api'
 import type { RootElement } from '../types'
+import CodeMirror from '@uiw/react-codemirror'
+import { StreamLanguage } from '@codemirror/language'
+import { xQuery } from '@codemirror/legacy-modes/mode/xquery'
 
 interface Props {
   db: string
@@ -85,12 +88,16 @@ export default function RunAnalysisModal({ db, onClose, onStarted }: Props) {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               CTS Constraint (XQuery)
             </label>
-            <textarea
-              value={constraint}
-              onChange={e => setConstraint(e.target.value)}
-              rows={3}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-500"
-            />
+            <div className="border border-gray-300 rounded focus-within:border-blue-500 text-sm font-mono overflow-hidden">
+              <CodeMirror
+                value={constraint}
+                onChange={setConstraint}
+                extensions={[StreamLanguage.define(xQuery)]}
+                basicSetup={{ lineNumbers: true, foldGutter: false, highlightActiveLine: false }}
+                minHeight="80px"
+                maxHeight="160px"
+              />
+            </div>
           </div>
 
           <div>

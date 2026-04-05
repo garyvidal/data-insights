@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useDatabase } from '../context/DatabaseContext'
 import {
   deleteAnalysis,
@@ -29,11 +29,15 @@ function fileSizeFormat(bytes: string | number): string {
 function TreeRow({
   node,
   selected,
+  collapsed,
   onClick,
+  onToggle,
 }: {
   node: AnalysisNode
   selected: boolean
+  collapsed: boolean
   onClick: (node: AnalysisNode) => void
+  onToggle: (key: string) => void
 }) {
   const depth = parseInt(node.level || '0') * 16
   const isAttr = node.localname?.startsWith('@')
@@ -45,7 +49,14 @@ function TreeRow({
     >
       <td>
         <div style={{ paddingLeft: depth }} className="flex items-center gap-1">
-          {!node.isLeaf && <span className="text-gray-400">▸</span>}
+          {!node.isLeaf && (
+            <span
+              className="text-gray-400 cursor-pointer hover:text-blue-500 select-none"
+              onClick={e => { e.stopPropagation(); onToggle(node.key) }}
+            >
+              {collapsed ? '▸' : '▾'}
+            </span>
+          )}
           {node.isLeaf && <span className="text-gray-300">–</span>}
           <span className={isAttr ? 'text-purple-600 font-mono text-xs' : 'font-mono text-xs'}>
             {node.localname}
@@ -80,6 +91,26 @@ export default function AnalyzePage() {
   const notificationTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const [rightPanelWidth, setRightPanelWidth] = useState(320)
   const [rightCollapsed, setRightCollapsed] = useState(false)
+  const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(new Set())
+
+  function toggleCollapse(key: string) {
+    setCollapsedKeys(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const visibleNodes = useMemo(() => {
+    const hidden = new Set<string>()
+    for (const node of nodes) {
+      if (collapsedKeys.has(node.parentKey) || hidden.has(node.parentKey)) {
+        hidden.add(node.key)
+      }
+    }
+    return nodes.filter(n => !hidden.has(n.key))
+  }, [nodes, collapsedKeys])
   const rightDragStart = useRef<{ x: number; w: number } | null>(null)
 
   const onRightResizeMouseDown = useCallback((e: React.MouseEvent) => {
@@ -107,6 +138,10 @@ export default function AnalyzePage() {
   // Load analysis list whenever DB changes
   useEffect(() => {
     if (!selectedDb) return
+    setNodes([])
+    setSelectedNode(null)
+    setDocStats(null)
+    setValues(null)
     getAnalysisList(selectedDb)
       .then(list => {
         setAnalyses(list)
@@ -123,6 +158,7 @@ export default function AnalyzePage() {
     setNodes([])
     setSelectedNode(null)
     setValues(null)
+    setCollapsedKeys(new Set())
     Promise.all([
       getAnalysisStructure(selectedAnalysis, selectedDb),
       getDocStats(selectedAnalysis, selectedDb),
@@ -288,12 +324,14 @@ export default function AnalyzePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {nodes.map(node => (
+                  {visibleNodes.map(node => (
                     <TreeRow
                       key={node.key}
                       node={node}
                       selected={selectedNode?.key === node.key}
+                      collapsed={collapsedKeys.has(node.key)}
                       onClick={setSelectedNode}
+                      onToggle={toggleCollapse}
                     />
                   ))}
                   {nodes.length === 0 && !loading && (

@@ -32,7 +32,7 @@ declare function resource:recurse($current, $elems, $attrs, $meta, $nss, $depth,
         let $attr-xpath := fn:concat($xpath, "/@", $a-pre, $a/attribute-localname)
         order by $a/attribute-localname
         return
-            <node>
+            <node type="attribute">
                 <key>{fn:data($a/key)}-{$depth + 1}</key>
                 <parent-key>{fn:data($a/element-key)}-{$depth}</parent-key>
                 <child-key>{fn:data($a/attribute-key)}</child-key>
@@ -63,7 +63,7 @@ declare function resource:recurse($current, $elems, $attrs, $meta, $nss, $depth,
     return
         if ($childs and fn:not(map:get($traversed, fn:string($current/key)))) then
         ( (:Nodes with Complex Relationship:)
-            <node>
+            <node type="complex">
                 <key>{fn:data($current/child-key)}-{$depth}</key>
                 <parent-key>{
                     if (xdmp:md5("") eq $current/parent-key)
@@ -102,7 +102,7 @@ declare function resource:recurse($current, $elems, $attrs, $meta, $nss, $depth,
         )
         else if (fn:not(map:get($traversed, fn:string($current/key)))) then
         ( (:Nodes with Simple Types:)
-            <node>
+            <node type="element">
                 <key>{fn:data($current/child-key)}-{$depth}</key>
                 <parent-key>{fn:data($current/parent-key)}-{$depth - 1}</parent-key>
                 <child-key>{fn:data($current/child-key)}</child-key>
@@ -318,7 +318,14 @@ declare function get(
                 }</namespaces>
             let $child     := $analysis/element-elements/element-element
             let $attrs     := $analysis/element-attributes/element-attribute
-            let $root      := $child[parent-key eq $root-k]
+            let $root      := 
+                  if($analysis/root-element/type eq "json")
+                  then (
+                      $child[parent-localname eq ""]
+                      )
+                  else (
+                    $child[parent-key eq $root-k]
+                  )
             let $traversed := map:map()
             let $structure :=
                 <structure>{

@@ -106,10 +106,41 @@ export default function DistributionPage() {
                   data={chartData}
                   cx="50%"
                   cy="50%"
-                  outerRadius={110}
+                  outerRadius={100}
                   dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  labelLine={false}
+                  label={({
+                    cx, cy, midAngle, outerRadius: r, name, percent,
+                  }: {
+                    cx: number; cy: number; midAngle: number
+                    outerRadius: number; name: string; percent: number
+                  }) => {
+                    if (percent < 0.04) return null
+                    const RAD = Math.PI / 180
+                    const x = cx + (r + 20) * Math.cos(-midAngle * RAD)
+                    const y = cy + (r + 20) * Math.sin(-midAngle * RAD)
+                    return (
+                      <text
+                        x={x} y={y}
+                        fill="#374151"
+                        textAnchor={x > cx ? 'start' : 'end'}
+                        dominantBaseline="central"
+                        fontSize={12}
+                      >
+                        {`${name} ${(percent * 100).toFixed(0)}%`}
+                      </text>
+                    )
+                  }}
+                  labelLine={({ midAngle, outerRadius: r, cx, cy, percent }: {
+                    midAngle: number; outerRadius: number; cx: number; cy: number; percent: number
+                  }) => {
+                    if (percent < 0.04) return <g />
+                    const RAD = Math.PI / 180
+                    const x1 = cx + r * Math.cos(-midAngle * RAD)
+                    const y1 = cy + r * Math.sin(-midAngle * RAD)
+                    const x2 = cx + (r + 16) * Math.cos(-midAngle * RAD)
+                    const y2 = cy + (r + 16) * Math.sin(-midAngle * RAD)
+                    return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#9ca3af" strokeWidth={1} />
+                  }}
                 >
                   {chartData.map((_, index) => (
                     <Cell key={index} fill={COLORS[index % COLORS.length]} />

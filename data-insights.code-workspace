@@ -3,5 +3,10 @@
 		{
 			"path": "."
 		}
-	]
+	],
+	"settings": {
+		"java.project.sourcePaths": [
+			"marklogic/src/main/ml-modules"
+		]
+	}
 }

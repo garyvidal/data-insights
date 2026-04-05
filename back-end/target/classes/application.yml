@@ -10,7 +10,8 @@ marklogic:
 spring:
   web:
     resources:
-      add-mappings: false
+      add-mappings: true
+      static-locations: classpath:/static/
 
 logging:
   level:

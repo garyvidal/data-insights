@@ -11,10 +11,17 @@
       "Read(//c/Gradle/**)",
       "Read(//c/Users/garyv/.gradle/**)",
       "Read(//c/Users/garyv/**)",
-      "Bash(find /c/Users/garyv/Workspace/data-insights/marklogic/src/main/ml-modules/lib -type f \\\\\\(-name *.xqy -o -name *.xql -o -name *.xquery \\\\\\))"
+      "Bash(find /c/Users/garyv/Workspace/data-insights/marklogic/src/main/ml-modules/lib -type f \\\\\\(-name *.xqy -o -name *.xql -o -name *.xquery \\\\\\))",
+      "WebFetch(domain:developer.marklogic.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:marklogic.github.io)",
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ],
     "additionalDirectories": [
-      "c:\\Users\\garyv\\Workspace\\data-insights\\marklogic\\.git"
+      "c:\\Users\\garyv\\Workspace\\data-insights\\marklogic\\.git",
+      "c:\\projects\\DataAnalyzer\\content-analyzer\\services",
+      "c:\\Users\\garyv\\Workspace\\data-insights"
     ]
   }
 }

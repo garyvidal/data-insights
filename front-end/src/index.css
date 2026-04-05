@@ -34,16 +34,16 @@
     @apply overflow-auto border border-gray-200 rounded-lg;
   }
   .data-table {
-    @apply w-full text-sm text-left;
+    @apply w-full text-sm text-left border-collapse;
   }
   .data-table thead {
     @apply bg-gray-100 text-gray-600 uppercase text-xs;
   }
   .data-table th {
-    @apply px-4 py-3 font-medium;
+    @apply px-4 py-3 font-medium border border-gray-200;
   }
   .data-table td {
-    @apply px-4 py-2 border-t border-gray-100;
+    @apply px-4 py-2 border border-gray-200;
   }
   .data-table tr:hover td {
     @apply bg-blue-50 cursor-pointer;
