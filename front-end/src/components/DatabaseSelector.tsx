@@ -4,12 +4,12 @@ export default function DatabaseSelector() {
   const { databases, selectedDb, setSelectedDb, loading } = useDatabase()
 
   if (loading) {
-    return <div className="text-xs text-gray-400 dark:text-gray-500 animate-pulse">Loading databases...</div>
+    return <div className="text-xs text-gray-400 dark:text-gray-300 animate-pulse">Loading databases...</div>
   }
 
   return (
     <div>
-      <label className="block text-xs text-gray-400 dark:text-gray-500 mb-1">Database</label>
+      <label className="block text-xs text-gray-400 dark:text-gray-300 mb-1">Database</label>
       <select
         value={selectedDb}
         onChange={e => setSelectedDb(e.target.value)}

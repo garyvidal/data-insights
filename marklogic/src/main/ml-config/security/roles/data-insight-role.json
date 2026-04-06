@@ -57,6 +57,21 @@
       "privilege-name": "xdmp:add-response-header",
       "action": "http://marklogic.com/xdmp/privileges/xdmp-add-response-header",
       "kind": "execute"
+    },
+    {
+      "privilege-name": "xdmp:value",
+      "action": "http://marklogic.com/xdmp/privileges/xdmp-value",
+      "kind": "execute"
+    },
+    {
+      "privilege-name": "xdmp:with-namespaces",
+      "action": "http://marklogic.com/xdmp/privileges/xdmp-with-namespaces",
+      "kind": "execute"
+    },
+    {
+      "privilege-name": "xdmp:spawn-in",
+      "action": "http://marklogic.com/xdmp/privileges/xdmp-spawn-in",
+      "kind": "execute"
     }
   ]
 }

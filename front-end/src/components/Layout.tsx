@@ -98,7 +98,7 @@ export default function Layout() {
           {!collapsed && (
             <>
               <h1 className="text-lg font-bold tracking-tight">Data Insights</h1>
-              <p className="text-xs text-gray-400 mt-0.5">MarkLogic Analyzer</p>
+              <p className="text-xs text-gray-400 dark:text-gray-300 mt-0.5">MarkLogic Analyzer</p>
             </>
           )}
           {collapsed && <div className="h-10" />}
@@ -176,11 +176,11 @@ export default function Layout() {
           ) : (
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-gray-400 truncate" title={user ?? ''}>{user}</span>
+                <span className="text-xs text-gray-400 dark:text-gray-300 truncate" title={user ?? ''}>{user}</span>
                 <button
                   onClick={toggleTheme}
                   title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-                  className="flex-shrink-0 text-xs text-gray-400 hover:text-white transition-colors p-1"
+                  className="flex-shrink-0 text-xs text-gray-400 dark:text-gray-300 hover:text-white transition-colors p-1"
                 >
                   {theme === 'light' ? (
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -204,7 +204,7 @@ export default function Layout() {
               <button
                 onClick={handleLogout}
                 title="Sign out"
-                className="w-full text-xs text-gray-400 hover:text-white transition-colors text-left"
+                className="w-full text-xs text-gray-400 dark:text-gray-300 hover:text-white transition-colors text-left"
               >
                 Sign out
               </button>

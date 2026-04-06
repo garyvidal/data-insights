@@ -93,7 +93,7 @@ export function SchemaManagementPage() {
           No schemas yet. Generate one from your analysis data.
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-4 bg-gray-50 dark:bg-gray-900">
           {schemas.map((schema) => (
             <div
               key={schema.schemaId}
@@ -114,7 +114,7 @@ export function SchemaManagementPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleViewSchema(schema.schemaId)}
-                    className="px-3 py-1 text-sm bg-slate-200 dark:bg-slate-700 rounded hover:bg-slate-300"
+                    className="px-3 py-1 text-sm bg-slate-200 dark:bg-slate-700 rounded hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-900 dark:text-white"
                   >
                     View
                   </button>

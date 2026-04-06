@@ -173,7 +173,6 @@ declare function a:analyze-json($objects as node()*) {
       return a:analyze-json($object/node())
      case object-node() | array-node() return
         for $prop at $pos in $object/node()
-        let $log := xdmp:log($prop)
         let $propname := fn:string(fn:name($prop))
         let $prop-key := fn:concat("",$ELEMENT_NS_JOINER,$propname)
         let $propkey  := fn:concat($obj-key,$ELEMENT_CHILD_JOINER,$prop-key)
@@ -786,6 +785,6 @@ return
     )
     ,$analysis,
     xdmp:log(
-      fn:concat("Started Completed for element(", $_root-element/localname, ") in ", $_database, " database with id: ", $id),
+      fn:concat("Analysis Complete for element(", $_root-element/localname, ") in ", $_database, " database with id: ", $id),
       "info")
 )

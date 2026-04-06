@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getRootElements, runAnalysis } from '../services/api'
 import type { RootElement } from '../types'
+import { useTheme } from '../context/ThemeContext'
 import CodeMirror from '@uiw/react-codemirror'
 import { StreamLanguage } from '@codemirror/language'
 import { xQuery } from '@codemirror/legacy-modes/mode/xquery'
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function RunAnalysisModal({ db, onClose, onStarted }: Props) {
+  const { theme } = useTheme()
   const [rootElements, setRootElements] = useState<RootElement[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [name, setName] = useState(`Analysis: ${db}`)
@@ -57,10 +59,10 @@ export default function RunAnalysisModal({ db, onClose, onStarted }: Props) {
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl mx-4 flex flex-col max-h-[90vh]">
         <div className="p-5 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Run Analysis — {db}</h2>
-          <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">×</button>
+          <button onClick={onClose} className="text-gray-400 dark:text-gray-300 hover:text-gray-600 dark:hover:text-white text-xl leading-none">×</button>
         </div>
 
-        <div className="overflow-auto p-5 space-y-4 flex-1 text-gray-900 dark:text-gray-100">
+        <div className="overflow-auto p-5 space-y-4 flex-1 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-900">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Analysis Name</label>
             <input
@@ -96,7 +98,7 @@ export default function RunAnalysisModal({ db, onClose, onStarted }: Props) {
                 basicSetup={{ lineNumbers: true, foldGutter: false, highlightActiveLine: false }}
                 minHeight="80px"
                 maxHeight="160px"
-                theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
+                theme={theme === 'dark' ? 'dark' : 'light'}
               />
             </div>
           </div>
@@ -125,7 +127,7 @@ export default function RunAnalysisModal({ db, onClose, onStarted }: Props) {
               </label>
             </div>
             {!selectAll && (
-              <div className="border border-gray-200 dark:border-gray-700 rounded max-h-48 overflow-auto dark:bg-gray-800">
+              <div className="border border-gray-200 dark:border-gray-700 rounded max-h-48 overflow-auto bg-white dark:bg-gray-800">
                 {rootElements.map(el => (
                   <label
                     key={el.id}

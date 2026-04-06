@@ -73,13 +73,13 @@ if(map:count($INPUT) gt 0) then
             and calling COMPLETE FUNCTION
           :)
           if($ex//error:error-code = "TASK-CANCEL") 
-          then (map:clear($INPUT),xdmp:log(fn:concat("Task Cancelled: ",$TASK-MODULE)))
+          then (map:clear($INPUT),xdmp:log(fn:concat("Task Cancelled: ",$TASK-MODULE),"warning"))
           else xdmp:rethrow() 
       }   
    return 
    (
        (:More work keep spawning yourself :)
-       xdmp:log(fn:concat("Processing Keys: ",map:count($work-map),"| TODO: ",map:count($INPUT),"| OUTPUT:",map:count($OUTPUT))),
+       xdmp:log(fn:concat("Processing Keys: ",map:count($work-map),"| TODO: ",map:count($INPUT),"| OUTPUT:",map:count($OUTPUT)),"debug"),
        xdmp:spawn("task-spawner.xqy", 
           (
              xs:QName("INPUT"), $INPUT,
@@ -100,7 +100,7 @@ else
  : say aggregate or some other fun stuff like updating a status
  :)
 (  
-   xdmp:log(fn:concat("Executing Complete Module:", $COMPLETE-MODULE," Output Count: ",map:count($OUTPUT))),
+   xdmp:log(fn:concat("Executing Complete Module:", $COMPLETE-MODULE," Output Count: ",map:count($OUTPUT)),"info"),
    xdmp:invoke($COMPLETE-MODULE,
       (
           xs:QName("OUTPUT"),$OUTPUT,

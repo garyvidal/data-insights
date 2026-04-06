@@ -3,11 +3,16 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    @apply bg-gray-50;
+  }
+  html.dark {
+    @apply bg-gray-950;
+  }
   body {
     @apply bg-gray-50 text-gray-900;
   }
-  
-  :root.dark body {
+  html.dark body {
     @apply bg-gray-950 text-gray-100;
   }
 }
@@ -19,98 +24,98 @@
   .btn-primary {
     @apply btn bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
   }
-  :root.dark .btn-primary {
+  html.dark .btn-primary {
     @apply bg-blue-700 hover:bg-blue-600 focus:ring-blue-400;
   }
   
   .btn-secondary {
     @apply btn bg-gray-200 text-gray-800 hover:bg-gray-300 focus:ring-gray-400;
   }
-  :root.dark .btn-secondary {
+  html.dark .btn-secondary {
     @apply bg-gray-700 text-gray-200 hover:bg-gray-600 focus:ring-gray-500;
   }
   
   .btn-danger {
     @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
   }
-  :root.dark .btn-danger {
+  html.dark .btn-danger {
     @apply bg-red-700 hover:bg-red-600 focus:ring-red-400;
   }
   
   .card {
     @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-gray-900;
   }
-  :root.dark .card {
+  html.dark .card {
     @apply bg-gray-900 border-gray-700 shadow-sm text-gray-100;
   }
   
   .stat-value {
     @apply text-2xl font-bold text-gray-900;
   }
-  :root.dark .stat-value {
+  html.dark .stat-value {
     @apply text-gray-100;
   }
   
   .stat-label {
     @apply text-sm text-gray-500 mt-1;
   }
-  :root.dark .stat-label {
+  html.dark .stat-label {
     @apply text-gray-400;
   }
   
   .table-container {
-    @apply overflow-auto border border-gray-200 rounded-lg;
+    @apply overflow-auto border border-gray-200 rounded-lg bg-white;
   }
-  :root.dark .table-container {
-    @apply border-gray-700;
+  html.dark .table-container {
+    @apply border-gray-700 bg-gray-900;
   }
   
   .data-table {
     @apply w-full text-sm text-left border-collapse;
   }
-  :root.dark .data-table {
+  html.dark .data-table {
     @apply text-gray-200;
   }
   
   .data-table thead {
     @apply bg-gray-100 text-gray-600 uppercase text-xs;
   }
-  :root.dark .data-table thead {
+  html.dark .data-table thead {
     @apply bg-gray-800 text-gray-300;
   }
   
   .data-table tbody {
     @apply bg-white;
   }
-  :root.dark .data-table tbody {
+  html.dark .data-table tbody {
     @apply bg-gray-900;
   }
   
   .data-table th {
     @apply px-4 py-3 font-medium border border-gray-200;
   }
-  :root.dark .data-table th {
+  html.dark .data-table th {
     @apply border-gray-700;
   }
   
   .data-table td {
     @apply px-4 py-2 border border-gray-200 text-gray-900;
   }
-  :root.dark .data-table td {
+  html.dark .data-table td {
     @apply border-gray-700 text-gray-200;
   }
   
   .data-table tr:hover td {
     @apply bg-blue-50 cursor-pointer;
   }
-  :root.dark .data-table tr:hover td {
+  html.dark .data-table tr:hover td {
     @apply bg-blue-900;
   }
   
   .data-table tr.selected td {
     @apply bg-blue-100;
   }
-  :root.dark .data-table tr.selected td {
+  html.dark .data-table tr.selected td {
     @apply bg-blue-800;
   }
 
@@ -118,9 +123,9 @@
   input, select, textarea {
     @apply bg-white text-gray-900;
   }
-  :root.dark input, 
-  :root.dark select, 
-  :root.dark textarea {
+  html.dark input, 
+  html.dark select, 
+  html.dark textarea {
     @apply bg-gray-800 text-gray-100 border-gray-600;
   }
 
@@ -129,4 +134,78 @@
   input[type="radio"] {
     @apply accent-blue-600;
   }
+
+  /* Focus indicators - WCAG 2.4.7 */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    @apply outline-2 outline-offset-2 outline-blue-500;
+  }
+  
+  html.dark button:focus-visible,
+  html.dark a:focus-visible,
+  html.dark input:focus-visible,
+  html.dark select:focus-visible,
+  html.dark textarea:focus-visible {
+    @apply outline-blue-400;
+  }
+
+  /* Link colors for dark mode - WCAG 2 Color Contrast */
+  a {
+    @apply text-blue-600 hover:text-blue-700;
+  }
+  html.dark a {
+    @apply text-blue-300 hover:text-blue-200;
+  }
+
+  /* Disabled state contrast - WCAG 1.4.11 */
+  button:disabled,
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    @apply opacity-60 cursor-not-allowed;
+  }
+
+  /*
+   * Comprehensive dark-mode fallbacks.
+   * Tailwind's dark: utility variants are not being applied (likely a JIT/build issue).
+   * These rules use the proven html.dark selector approach to cover all light-mode
+   * background, text, and border classes used across the codebase.
+   * Live in @layer components so genuine Tailwind utilities still win if ever fixed.
+   */
+
+  /* Backgrounds */
+  html.dark .bg-white        { background-color: theme('colors.gray.900'); }
+  html.dark .bg-gray-50      { background-color: theme('colors.gray.900'); }
+  html.dark .bg-gray-100     { background-color: theme('colors.gray.800'); }
+  html.dark .bg-gray-200     { background-color: theme('colors.gray.700'); }
+  html.dark .bg-slate-50     { background-color: theme('colors.slate.900'); }
+  html.dark .bg-slate-100    { background-color: theme('colors.slate.800'); }
+  html.dark .bg-slate-200    { background-color: theme('colors.slate.700'); }
+
+  /* Text colors */
+  html.dark .text-gray-900   { color: theme('colors.gray.100'); }
+  html.dark .text-gray-800   { color: theme('colors.gray.200'); }
+  html.dark .text-gray-700   { color: theme('colors.gray.300'); }
+  html.dark .text-gray-600   { color: theme('colors.gray.400'); }
+  html.dark .text-gray-500   { color: theme('colors.gray.400'); }
+  html.dark .text-slate-900  { color: theme('colors.slate.100'); }
+  html.dark .text-slate-800  { color: theme('colors.slate.200'); }
+  html.dark .text-slate-700  { color: theme('colors.slate.300'); }
+  html.dark .text-slate-600  { color: theme('colors.slate.400'); }
+  html.dark .text-slate-500  { color: theme('colors.slate.400'); }
+
+  /* Border colors */
+  html.dark .border-gray-200  { border-color: theme('colors.gray.700'); }
+  html.dark .border-gray-300  { border-color: theme('colors.gray.600'); }
+  html.dark .border-slate-200 { border-color: theme('colors.slate.700'); }
+  html.dark .border-slate-300 { border-color: theme('colors.slate.600'); }
+
+  /* Hover backgrounds — light variants that show as white flash on hover */
+  html.dark .hover\:bg-gray-50:hover    { background-color: theme('colors.gray.700'); }
+  html.dark .hover\:bg-gray-100:hover   { background-color: theme('colors.gray.700'); }
+  html.dark .hover\:bg-slate-100:hover  { background-color: theme('colors.slate.700'); }
+  html.dark .hover\:bg-slate-300:hover  { background-color: theme('colors.slate.600'); }
 }

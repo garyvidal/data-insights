@@ -50,7 +50,7 @@ export default function HomePage() {
           <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
             Document Counts
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8 bg-gray-50 dark:bg-gray-950">
             <StatCard value={stats.allDocuments} label="All Documents" />
             <StatCard value={stats.xmlDocuments} label="XML" />
             <StatCard value={stats.jsonDocuments} label="JSON" />

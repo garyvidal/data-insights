@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { useDatabase } from '../context/DatabaseContext'
+import { useTheme } from '../context/ThemeContext'
 import { getRootElements } from '../services/api'
 import type { RootElement } from '../types'
 import LoadingOverlay from '../components/LoadingOverlay'
@@ -21,6 +22,8 @@ function buildChartData(elements: RootElement[]) {
 
 export default function DistributionPage() {
   const { selectedDb } = useDatabase()
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
   const [elements, setElements] = useState<RootElement[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -47,7 +50,7 @@ export default function DistributionPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-gray-50 dark:bg-gray-950">
         {/* Table */}
         <div className="card">
           <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">Root Elements</h3>
@@ -118,7 +121,6 @@ export default function DistributionPage() {
                     const RAD = Math.PI / 180
                     const x = cx + (r + 20) * Math.cos(-midAngle * RAD)
                     const y = cy + (r + 20) * Math.sin(-midAngle * RAD)
-                    const isDark = document.documentElement.classList.contains('dark')
                     return (
                       <text
                         x={x} y={y}
@@ -140,7 +142,6 @@ export default function DistributionPage() {
                     const y1 = cy + r * Math.sin(-midAngle * RAD)
                     const x2 = cx + (r + 16) * Math.cos(-midAngle * RAD)
                     const y2 = cy + (r + 16) * Math.sin(-midAngle * RAD)
-                    const isDark = document.documentElement.classList.contains('dark')
                     return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={isDark ? '#6b7280' : '#9ca3af'} strokeWidth={1} />
                   }}
                 >
@@ -151,12 +152,12 @@ export default function DistributionPage() {
                 <Tooltip
                   formatter={(value: number) => [value.toLocaleString(), 'Documents']}
                   contentStyle={{
-                    backgroundColor: document.documentElement.classList.contains('dark') ? '#111827' : '#ffffff',
-                    borderColor: document.documentElement.classList.contains('dark') ? '#374151' : '#d1d5db',
-                    color: document.documentElement.classList.contains('dark') ? '#f3f4f6' : '#000000'
+                    backgroundColor: isDark ? '#111827' : '#ffffff',
+                    borderColor: isDark ? '#374151' : '#d1d5db',
+                    color: isDark ? '#f3f4f6' : '#000000'
                   }}
                 />
-                <Legend />
+                <Legend wrapperStyle={{ color: isDark ? '#d1d5db' : '#374151' }} />
               </PieChart>
             </ResponsiveContainer>
           ) : (

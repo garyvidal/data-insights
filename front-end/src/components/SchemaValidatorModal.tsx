@@ -107,7 +107,7 @@ export function SchemaValidatorModal({
                   setValidationResult(null);
                   setDocumentContent("");
                 }}
-                className="flex-1 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded hover:bg-slate-300"
+                className="flex-1 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded hover:bg-slate-300 dark:hover:bg-slate-600"
               >
                 Validate Another
               </button>

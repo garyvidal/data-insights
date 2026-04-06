@@ -26,4 +26,4 @@ let $process :=
     return 
        map:put($TASK-OUTPUT,$nodeKey,(map:get($TASK-OUTPUT,$nodeKey),0)[1] + 1)   
 return 
-    ($TASK-OUTPUT,xdmp:log(fn:concat("TASK OUTPUT:",map:count($TASK-OUTPUT))))
+    ($TASK-OUTPUT,xdmp:log(fn:concat("TASK OUTPUT:",map:count($TASK-OUTPUT)),"debug"))

@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useDatabase } from '../context/DatabaseContext'
 import {
@@ -337,9 +338,9 @@ export default function AnalyzePage() {
       )}
 
       {/* Content area */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden bg-gray-50 dark:bg-gray-900">
         {/* Left — Structure tree */}
-        <div className="flex-1 overflow-auto border-r border-gray-200 dark:border-gray-700">
+        <div className="flex-1 overflow-auto border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
           {/* Tabs */}
           <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0">
             {tabs.map(t => (
@@ -442,7 +443,7 @@ export default function AnalyzePage() {
                   ))}
                 </div>
 
-                <div className="overflow-auto flex-1">
+                <div className="overflow-auto flex-1 bg-white dark:bg-gray-900">
                   {rightTab === 'values' && (() => {
                     const sorted = [...(values?.rows ?? [])].sort((a, b) => {
                       const mul = valuesSort.dir === 'asc' ? 1 : -1
@@ -488,8 +489,8 @@ export default function AnalyzePage() {
                   })()}
 
                   {rightTab === 'xpaths' && (
-                    <div className="p-3">
-                      <p className="font-mono text-xs break-all text-gray-800 dark:text-gray-300">
+                    <div className="p-3 bg-white dark:bg-gray-900">
+                      <p className="font-mono text-xs break-all text-gray-800 dark:text-gray-200">
                         {selectedNode.xpath || <span className="text-gray-400 dark:text-gray-500">No XPath available</span>}
                       </p>
                     </div>

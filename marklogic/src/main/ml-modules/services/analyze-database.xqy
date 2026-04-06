@@ -12,7 +12,7 @@ declare function post(
     $params  as map:map,
     $input   as document-node()*
 ) as document-node()? {
-    let $_ := xdmp:log(("Starting analyze-database input::", $input), "info")
+    let $_ := xdmp:log(("Starting analyze-database input::", $input), "debug")
     let $body       := $input/object-node()
     let $db         := $body/db/fn:string(.)
     let $sample     := ($body/sample/fn:string(.), "100")[1] cast as xs:integer
@@ -21,13 +21,13 @@ declare function post(
     let $name       := ($body/name/fn:string(.), fn:concat("Analysis:", $db, " ", fn:current-dateTime()))[1]
     let $all        := ($body/all/fn:string(.), "false")[1]
     let $select-ids := $body/rootElements/fn:string(.)
-    let $_          := xdmp:log(("selected-ids::", $select-ids), "info")
+    let $_          := xdmp:log(("selected-ids::", $select-ids), "debug")
     let $namespaces :=
         if (/ca:namespace-list[ca:database = $db])
         then /ca:namespace-list[ca:database = $db]
         else <ca:namespace-list/>
     let $ns-seq := $namespaces/ca:namespace/(ca:prefix|ca:namespace-uri)/fn:string(.)
-    let $_      := xdmp:log(("namespaces::", $ns-seq), "info")
+    let $_      := xdmp:log(("namespaces::", $ns-seq), "debug")
     let $cts-constraint :=
         <c>{xdmp:value("xdmp:with-namespaces($ns-seq, $constraint)")}</c>/*
     let $cts-constraint := ($cts-constraint, cts:and-query(()))[1]
