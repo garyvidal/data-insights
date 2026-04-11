@@ -8,7 +8,11 @@
       "Bash(wc -l back-end/src/main/java/com/datainsights/**/*.java)",
       "Read(//c/projects/DataAnalyzer/content-analyzer/**)",
       "Bash(ls c:/Users/garyv/Workspace/data-insights/*.md)",
-      "Bash(ls c:/Users/garyv/Workspace/data-insights/docs/*.md)"
+      "Bash(ls c:/Users/garyv/Workspace/data-insights/docs/*.md)",
+      "Bash(xxd c:/Users/garyv/Workspace/data-insights/README.md)",
+      "Bash(iconv -f UTF-16LE -t UTF-8 README.md -o README_utf8.md)",
+      "Bash(mv README_utf8.md README.md)",
+      "Bash(xxd README.md)"
     ]
   }
 }
