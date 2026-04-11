@@ -6,7 +6,9 @@
       "Bash(git tag:*)",
       "Bash(git push:*)",
       "Bash(wc -l back-end/src/main/java/com/datainsights/**/*.java)",
-      "Read(//c/projects/DataAnalyzer/content-analyzer/**)"
+      "Read(//c/projects/DataAnalyzer/content-analyzer/**)",
+      "Bash(ls c:/Users/garyv/Workspace/data-insights/*.md)",
+      "Bash(ls c:/Users/garyv/Workspace/data-insights/docs/*.md)"
     ]
   }
 }
