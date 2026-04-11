@@ -19,6 +19,8 @@ import type {
   SchemaInfo,
   UploadResult,
   UploadPermission,
+  SearchOptionsSet,
+  SearchResultSet,
 } from '../types'
 
 const api = axios.create({ baseURL: '/api', withCredentials: true })
@@ -147,6 +149,7 @@ export interface QueryResult {
   uri: string
   type: string
   content: string
+  collections?: string[]
 }
 
 export const executeQueryResults = (
@@ -219,6 +222,41 @@ export const analyzeAnomalies = (
       params: { schemaId },
     })
     .then(r => r.data)
+
+// ── Search Options ────────────────────────────────────────────────────────
+
+export const listSearchOptions = (db: string, analysisId?: string): Promise<SearchOptionsSet[]> =>
+  api.get('/search-options', { params: { db, 'analysis-id': analysisId ?? '' } }).then(r => r.data)
+
+export const getSearchOptions = (id: string): Promise<SearchOptionsSet> =>
+  api.get(`/search-options/${id}`).then(r => r.data)
+
+export const saveSearchOptions = (
+  db: string,
+  analysisId: string,
+  name: string,
+  options: string,
+): Promise<{ id: string }> =>
+  api.post('/search-options', { db, analysisId, name, options }).then(r => r.data)
+
+export const updateSearchOptions = (
+  id: string,
+  name: string,
+  options: string,
+): Promise<{ id: string }> =>
+  api.put(`/search-options/${id}`, { name, options }).then(r => r.data)
+
+export const deleteSearchOptions = (id: string): Promise<void> =>
+  api.delete(`/search-options/${id}`).then(() => undefined)
+
+export const executeSearch = (
+  db: string,
+  optionsId: string,
+  query: string,
+  page: number,
+  pageSize: number,
+): Promise<SearchResultSet> =>
+  api.post('/search', { db, optionsId, query, page, pageSize }).then(r => r.data)
 
 // ── Upload ────────────────────────────────────────────────────────────────
 

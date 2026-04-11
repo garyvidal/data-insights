@@ -49,13 +49,20 @@ const UploadIcon = () => (
   </svg>
 )
 
+const SearchIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>
+)
+
 const navItems = [
   { to: '/home', label: 'Home', Icon: HomeIcon },
   { to: '/distribution', label: 'Distribution', Icon: DistributionIcon },
   { to: '/analyze', label: 'Analyze', Icon: AnalyzeIcon },
   { to: '/schema', label: 'Schema', Icon: SchemaIcon },
   { to: '/upload', label: 'Upload', Icon: UploadIcon },
-  // { to: '/coverage', label: 'Coverage' },
+  // { to: '/search', label: 'Search', Icon: SearchIcon },
 ]
 
 export default function Layout() {

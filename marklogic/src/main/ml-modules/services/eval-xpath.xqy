@@ -94,7 +94,10 @@ declare function post(
                     <pageSize>{$page-size}</pageSize>
                     <results>{
                         for $r in $results
-                        return <result uri="{xdmp:node-uri($r)}" type="{xdmp:node-kind($r)}">{
+                        return 
+                        <result uri="{xdmp:node-uri($r)}" 
+                        type="{xdmp:node-kind($r)}"
+                        collections="{fn:string-join(xdmp:document-get-collections(xdmp:node-uri($r)), ',')}">{
                             if ($r instance of document-node())
                             then xdmp:quote($r/node()[1])
                             else xdmp:quote($r)

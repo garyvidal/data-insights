@@ -40,6 +40,7 @@ export interface AnalysisNode {
   frequency: string
   distinctValues: string
   inferedTypes: string
+  nodeKind: string
   minLength: string
   maxLength: string
   averageLength: string
@@ -157,6 +158,57 @@ export interface SchemaInfo {
   database: string
   documentCount: number
   createdAt: string
+}
+
+// ── Search Types ──────────────────────────────────────────────────────────
+
+export type SearchConstraintType = 'word' | 'value' | 'range' | 'collection'
+
+export interface SearchConstraint {
+  id: string            // local uuid for react key
+  name: string          // constraint name used in query string
+  type: SearchConstraintType
+  localname: string
+  namespace: string
+  nodeKind: string      // "object" | "array" | "" for XML
+  inferedTypes: string
+  facet: boolean
+}
+
+export interface SearchOptionsSet {
+  id: string
+  name: string
+  database: string
+  analysisId: string
+  createdAt: string
+  constraints?: SearchConstraint[]
+}
+
+export interface SearchFacetValue {
+  name: string
+  count: string
+}
+
+export interface SearchFacet {
+  name: string
+  values: SearchFacetValue[]
+}
+
+export interface SearchResultItem {
+  uri: string
+  type: string
+  content: string
+  collections?: string[]
+}
+
+export interface SearchResultSet {
+  valid: boolean
+  estimate: string
+  page: number
+  pageSize: number
+  error?: string
+  facets: SearchFacet[]
+  results: SearchResultItem[]
 }
 
 // ── Upload Types ──────────────────────────────────────────────────────────

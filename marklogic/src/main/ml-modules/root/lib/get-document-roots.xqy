@@ -50,10 +50,11 @@ declare function a:get-root-objects($bdone,$qnames,$results) {
       else ()
     let $rnode :=       
         if(fn:not(fn:empty($qnames))) 
-        then cts:search(fn:doc()[object-node()],cts:and-query(($base-constraint,$constraint)),"unfiltered")[1]/object-node()/object-node()[1]
-        else cts:search(fn:doc()[object-node()],cts:and-query(()),"unfiltered")[1]/object-node()/object-node()[1]
+        then cts:search(fn:doc()[object-node()],cts:and-query(($base-constraint,$constraint)),"unfiltered")[1]/object-node()/(array-node()|object-node())[1]
+        else cts:search(fn:doc()[object-node()],cts:and-query(()),"unfiltered")[1]/object-node()/(array-node()|object-node())[1]
     return
-        if($rnode instance of object-node() and fn:not(fn:local-name-from-QName(fn:node-name($rnode)) = $qnames)) then
+        if(($rnode instance of object-node() or $rnode instance of array-node())
+            and fn:not(fn:local-name-from-QName(fn:node-name($rnode)) = $qnames)) then
             let $qname := fn:string(fn:node-name($rnode))
             let $key := fn:concat(fn:node-name($rnode))
             return (

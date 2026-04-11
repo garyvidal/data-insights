@@ -12,7 +12,9 @@
       "Bash(xxd c:/Users/garyv/Workspace/data-insights/README.md)",
       "Bash(iconv -f UTF-16LE -t UTF-8 README.md -o README_utf8.md)",
       "Bash(mv README_utf8.md README.md)",
-      "Bash(xxd README.md)"
+      "Bash(xxd README.md)",
+      "Bash(curl -s --digest -u admin:admin http://localhost:9091/v1/config/properties)",
+      "Bash(mvn compile:*)"
     ]
   }
 }

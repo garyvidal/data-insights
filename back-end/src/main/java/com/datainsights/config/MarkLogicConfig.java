@@ -1,5 +1,7 @@
 package com.datainsights.config;
 
+import com.marklogic.client.DatabaseClient;
+import com.marklogic.client.DatabaseClientFactory;
 import org.apache.hc.client5.http.auth.AuthScope;
 import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
 import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
@@ -48,7 +50,18 @@ public class MarkLogicConfig {
         return new RestTemplate(factory);
     }
 
-    public String getBaseUrl() {
-        return "http://" + host + ":" + port;
+    /**
+     * Creates a DatabaseClient for the given user and target database using Digest auth.
+     * The caller is responsible for calling client.release() when done.
+     */
+    public DatabaseClient createDatabaseClient(String user, String pass, String database) {
+        return DatabaseClientFactory.newClient(
+                host, port, database,
+                new DatabaseClientFactory.DigestAuthContext(user, pass)
+        );
     }
+
+    public String getHost() { return host; }
+    public int getPort()    { return port; }
+    public String getBaseUrl() { return "http://" + host + ":" + port; }
 }

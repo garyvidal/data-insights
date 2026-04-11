@@ -3,11 +3,23 @@ import { useNavigate } from 'react-router-dom'
 import { useDatabase } from '../context/useDatabase'
 import { uploadFiles } from '../services/api'
 import type { UploadPermission, UploadResult } from '../types'
-import { ChevronRight, ChevronLeft, Upload, X, Plus, UploadCloud, RefreshCw, LayoutDashboard } from 'lucide-react'
+import { ChevronRight, ChevronLeft, Upload, X, Plus, UploadCloud, RefreshCw, LayoutDashboard, Eye } from 'lucide-react'
+import Papa from 'papaparse'
+import * as XLSX from 'xlsx'
+import JSZip from 'jszip'
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
-type Step = 'upload' | 'permissions' | 'summary' | 'results'
+type Step = 'upload' | 'preview' | 'permissions' | 'summary' | 'results'
+type Capability = 'read' | 'update' | 'insert' | 'execute'
+
+// UI-only — one row per role, multiple capabilities selectable
+interface PermissionRow {
+  role: string
+  capabilities: Set<Capability>
+}
+
+const ALL_CAPS: Capability[] = ['read', 'update', 'insert', 'execute']
 
 const ACCEPTED_EXTS = new Set(['json', 'xml', 'csv', 'xlsx', 'xls', 'zip'])
 const ACCEPT_ATTR = '.json,.xml,.csv,.xlsx,.xls,.zip'
@@ -32,14 +44,103 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+// ── Preview data types ────────────────────────────────────────────────────
+
+type CsvPreview = { headers: string[]; rows: string[][] }
+type SheetPreview = { sheet: string; headers: string[]; rows: string[][] }
+type ZipEntry = { name: string; size: number; isDir: boolean }
+type TextPreview = { text: string }
+
+type FilePreview =
+  | { kind: 'csv'; data: CsvPreview }
+  | { kind: 'excel'; sheets: SheetPreview[] }
+  | { kind: 'zip'; entries: ZipEntry[] }
+  | { kind: 'text'; data: TextPreview }
+  | { kind: 'error'; message: string }
+  | { kind: 'loading' }
+
+// ── Preview parsers ───────────────────────────────────────────────────────
+
+const MAX_PREVIEW_ROWS = 20
+const MAX_TEXT_CHARS = 3000
+
+async function buildPreview(file: File): Promise<FilePreview> {
+  const ext = getExt(file.name)
+
+  if (ext === 'csv') {
+    return new Promise(resolve => {
+      Papa.parse(file, {
+        preview: MAX_PREVIEW_ROWS + 1,
+        complete(results) {
+          const all = results.data as string[][]
+          if (all.length === 0) return resolve({ kind: 'csv', data: { headers: [], rows: [] } })
+          const [headers, ...rows] = all
+          resolve({ kind: 'csv', data: { headers, rows: rows.slice(0, MAX_PREVIEW_ROWS) } })
+        },
+        error(err) {
+          resolve({ kind: 'error', message: err.message })
+        },
+      })
+    })
+  }
+
+  if (ext === 'xlsx' || ext === 'xls') {
+    try {
+      const buf = await file.arrayBuffer()
+      const wb = XLSX.read(buf, { type: 'array' })
+      const sheets: SheetPreview[] = wb.SheetNames.slice(0, 5).map(name => {
+        const ws = wb.Sheets[name]
+        const raw: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][]
+        const [headers = [], ...rows] = raw
+        return {
+          sheet: name,
+          headers: headers.map(String),
+          rows: rows.slice(0, MAX_PREVIEW_ROWS).map(r => r.map(String)),
+        }
+      })
+      return { kind: 'excel', sheets }
+    } catch (e: any) {
+      return { kind: 'error', message: e.message }
+    }
+  }
+
+  if (ext === 'zip') {
+    try {
+      const buf = await file.arrayBuffer()
+      const zip = await JSZip.loadAsync(buf)
+      const entries: ZipEntry[] = []
+      zip.forEach((relativePath, zipEntry) => {
+        entries.push({
+          name: relativePath,
+          size: zipEntry.dir ? 0 : (zipEntry as any)._data?.uncompressedSize ?? 0,
+          isDir: zipEntry.dir,
+        })
+      })
+      entries.sort((a, b) => a.name.localeCompare(b.name))
+      return { kind: 'zip', entries }
+    } catch (e: any) {
+      return { kind: 'error', message: e.message }
+    }
+  }
+
+  // JSON / XML — text preview
+  try {
+    const text = await file.text()
+    return { kind: 'text', data: { text: text.slice(0, MAX_TEXT_CHARS) } }
+  } catch (e: any) {
+    return { kind: 'error', message: e.message }
+  }
+}
+
 // ── Step indicator ────────────────────────────────────────────────────────
 
 function StepIndicator({ current }: { current: Step }) {
   const steps: { key: Step; label: string }[] = [
     { key: 'upload', label: '1. Upload' },
-    { key: 'permissions', label: '2. Permissions' },
-    { key: 'summary', label: '3. Summary' },
-    { key: 'results', label: '4. Results' },
+    { key: 'preview', label: '2. Preview' },
+    { key: 'permissions', label: '3. Permissions' },
+    { key: 'summary', label: '4. Summary' },
+    { key: 'results', label: '5. Results' },
   ]
   const currentIdx = steps.findIndex(s => s.key === current)
   return (
@@ -62,6 +163,128 @@ function StepIndicator({ current }: { current: Step }) {
   )
 }
 
+// ── Preview panel components ──────────────────────────────────────────────
+
+function CsvTable({ data }: { data: CsvPreview }) {
+  if (data.headers.length === 0) return <p className="text-sm text-gray-400 italic p-4">Empty file</p>
+  return (
+    <div className="overflow-auto max-h-72 text-xs">
+      <table className="min-w-full border-collapse">
+        <thead className="sticky top-0 bg-gray-100 dark:bg-gray-700">
+          <tr>
+            {data.headers.map((h, i) => (
+              <th key={i} className="px-3 py-1.5 text-left font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-600 whitespace-nowrap">
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.rows.map((row, ri) => (
+            <tr key={ri} className={ri % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-750'}>
+              {data.headers.map((_, ci) => (
+                <td key={ci} className="px-3 py-1 text-gray-800 dark:text-gray-200 border-b border-gray-100 dark:border-gray-700 whitespace-nowrap max-w-[200px] truncate">
+                  {row[ci] ?? ''}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function ExcelPreview({ sheets }: { sheets: SheetPreview[] }) {
+  const [activeSheet, setActiveSheet] = useState(0)
+  const sheet = sheets[activeSheet]
+  return (
+    <div>
+      {sheets.length > 1 && (
+        <div className="flex gap-1 px-3 pt-2 flex-wrap">
+          {sheets.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveSheet(i)}
+              className={`text-xs px-2.5 py-1 rounded border transition-colors ${
+                i === activeSheet
+                  ? 'bg-blue-600 border-blue-600 text-white'
+                  : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-blue-400'
+              }`}
+            >
+              {s.sheet}
+            </button>
+          ))}
+        </div>
+      )}
+      <CsvTable data={{ headers: sheet.headers, rows: sheet.rows }} />
+    </div>
+  )
+}
+
+function ZipTree({ entries }: { entries: ZipEntry[] }) {
+  const dirs = entries.filter(e => e.isDir)
+  const files = entries.filter(e => !e.isDir)
+  return (
+    <div className="overflow-auto max-h-72 p-3 text-xs font-mono space-y-0.5">
+      {dirs.map((e, i) => (
+        <div key={i} className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400">
+          <span>📁</span>
+          <span className="truncate">{e.name}</span>
+        </div>
+      ))}
+      {files.map((e, i) => {
+        const ext = getExt(e.name)
+        const supported = ACCEPTED_EXTS.has(ext)
+        return (
+          <div key={i} className={`flex items-center gap-1.5 ${supported ? 'text-gray-800 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'}`}>
+            <span>{supported ? '📄' : '⬜'}</span>
+            <span className="flex-1 truncate">{e.name}</span>
+            <span className="flex-shrink-0 text-gray-400">{e.size ? formatBytes(e.size) : ''}</span>
+            {!supported && <span className="text-gray-400 text-[10px]">(skip)</span>}
+          </div>
+        )
+      })}
+      <p className="text-gray-400 pt-1">{files.length} file{files.length !== 1 ? 's' : ''} · {dirs.length} folder{dirs.length !== 1 ? 's' : ''}</p>
+    </div>
+  )
+}
+
+function TextPreviewPanel({ data }: { data: TextPreview }) {
+  return (
+    <pre className="overflow-auto max-h-72 p-3 text-xs text-gray-800 dark:text-gray-200 font-mono whitespace-pre leading-relaxed">
+      {data.text}
+    </pre>
+  )
+}
+
+function FilePreviewCard({ file, preview }: { file: File; preview: FilePreview }) {
+  const ext = getExt(file.name)
+  return (
+    <div className="rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="bg-gray-100 dark:bg-gray-700 px-3 py-2 flex items-center gap-2">
+        <span className="text-xs font-mono uppercase text-gray-500 dark:text-gray-400 w-8">{ext}</span>
+        <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{file.name}</span>
+        <span className="text-xs text-gray-400">{formatBytes(file.size)}</span>
+      </div>
+      <div className="bg-white dark:bg-gray-800">
+        {preview.kind === 'loading' && (
+          <div className="flex items-center gap-2 p-4 text-sm text-gray-400">
+            <RefreshCw size={13} className="animate-spin" /> Parsing…
+          </div>
+        )}
+        {preview.kind === 'error' && (
+          <p className="p-3 text-sm text-red-600 dark:text-red-400">{preview.message}</p>
+        )}
+        {preview.kind === 'csv' && <CsvTable data={preview.data} />}
+        {preview.kind === 'excel' && <ExcelPreview sheets={preview.sheets} />}
+        {preview.kind === 'zip' && <ZipTree entries={preview.entries} />}
+        {preview.kind === 'text' && <TextPreviewPanel data={preview.data} />}
+      </div>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────
 
 export default function UploadPage() {
@@ -76,20 +299,23 @@ export default function UploadPage() {
   const [dragging, setDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Step 2: permissions
+  // Step 2: preview
+  const [previews, setPreviews] = useState<Map<string, FilePreview>>(new Map())
+
+  // Step 3: permissions
   const [database, setDatabase] = useState(selectedDb)
   const [collection, setCollection] = useState('')
   const [uriPrefix, setUriPrefix] = useState('/upload/')
   const [rootKey, setRootKey] = useState('')
-  const [permissions, setPermissions] = useState<UploadPermission[]>([
-    { role: 'data-insight-role', capability: 'read' },
+  const [permissions, setPermissions] = useState<PermissionRow[]>([
+    { role: 'data-insight-role', capabilities: new Set<Capability>(['read']) },
   ])
 
-  // Step 3 / upload
+  // Step 4 / upload
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
-  // Step 4: results
+  // Step 5: results
   const [result, setResult] = useState<UploadResult | null>(null)
 
   // ── File helpers ──────────────────────────────────────────────────────
@@ -121,18 +347,58 @@ export default function UploadPage() {
     addFiles(e.dataTransfer.files)
   }
 
+  // ── Preview helpers ───────────────────────────────────────────────────
+
+  async function loadPreviews() {
+    const map = new Map<string, FilePreview>()
+    files.forEach(f => map.set(f.name, { kind: 'loading' }))
+    setPreviews(new Map(map))
+    await Promise.all(
+      files.map(async f => {
+        const p = await buildPreview(f)
+        map.set(f.name, p)
+        setPreviews(new Map(map))
+      })
+    )
+  }
+
+  function goToPreview() {
+    setStep('preview')
+    loadPreviews()
+  }
+
   // ── Permission helpers ────────────────────────────────────────────────
 
   function addPermission() {
-    setPermissions(p => [...p, { role: '', capability: 'read' }])
+    setPermissions(p => [...p, { role: '', capabilities: new Set<Capability>(['read']) }])
   }
 
   function removePermission(idx: number) {
     setPermissions(p => p.filter((_, i) => i !== idx))
   }
 
-  function updatePermission(idx: number, field: keyof UploadPermission, value: string) {
-    setPermissions(p => p.map((perm, i) => i === idx ? { ...perm, [field]: value } : perm))
+  function updatePermissionRole(idx: number, role: string) {
+    setPermissions(p => p.map((perm, i) => i === idx ? { ...perm, role } : perm))
+  }
+
+  function toggleCapability(idx: number, cap: Capability) {
+    setPermissions(p => p.map((perm, i) => {
+      if (i !== idx) return perm
+      const next = new Set(perm.capabilities)
+      next.has(cap) ? next.delete(cap) : next.add(cap)
+      // keep at least one selected
+      if (next.size === 0) next.add(cap)
+      return { ...perm, capabilities: next }
+    }))
+  }
+
+  // Flatten PermissionRows → UploadPermission[] (one entry per role+capability pair)
+  function flattenPermissions(): UploadPermission[] {
+    return permissions.flatMap(p =>
+      p.role.trim()
+        ? [...p.capabilities].map(cap => ({ role: p.role.trim(), capability: cap }))
+        : []
+    )
   }
 
   // ── Upload ────────────────────────────────────────────────────────────
@@ -142,8 +408,7 @@ export default function UploadPage() {
     setUploading(true)
     setUploadError(null)
     try {
-      const validPerms = permissions.filter(p => p.role.trim() && p.capability)
-      const res = await uploadFiles(files, database, collection || undefined, uriPrefix, validPerms, rootKey || undefined)
+      const res = await uploadFiles(files, database, collection || undefined, uriPrefix, flattenPermissions(), rootKey || undefined)
       setResult(res)
       setStep('results')
     } catch (err: any) {
@@ -156,6 +421,7 @@ export default function UploadPage() {
   function reset() {
     setStep('upload')
     setFiles([])
+    setPreviews(new Map())
     setResult(null)
     setFileError(null)
     setUploadError(null)
@@ -265,8 +531,42 @@ export default function UploadPage() {
           <div className="flex justify-end pt-2">
             <button
               disabled={files.length === 0}
-              onClick={() => setStep('permissions')}
+              onClick={goToPreview}
               className="flex items-center gap-1.5 px-4 py-2 rounded-md border border-blue-400 dark:border-blue-400/40 bg-gray-100 dark:bg-transparent text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-400/10 hover:border-blue-500 dark:hover:border-blue-400/70 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+            >
+              <Eye size={14} /> Preview <ChevronRight size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 2: Preview ───────────────────────────────────────────── */}
+      {step === 'preview' && (
+        <div className="space-y-4">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Showing a preview of each file's content before upload. CSV and Excel are limited to the first {MAX_PREVIEW_ROWS} rows.
+          </p>
+
+          <div className="space-y-4">
+            {files.map(f => (
+              <FilePreviewCard
+                key={f.name}
+                file={f}
+                preview={previews.get(f.name) ?? { kind: 'loading' }}
+              />
+            ))}
+          </div>
+
+          <div className="flex justify-between pt-2">
+            <button
+              onClick={() => setStep('upload')}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-md border border-gray-400 dark:border-white/25 bg-gray-100 dark:bg-transparent text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 hover:border-gray-500 dark:hover:border-white/50 transition-colors"
+            >
+              <ChevronLeft size={15} /> Back
+            </button>
+            <button
+              onClick={() => setStep('permissions')}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-md border border-blue-400 dark:border-blue-400/40 bg-gray-100 dark:bg-transparent text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-400/10 hover:border-blue-500 dark:hover:border-blue-400/70 text-sm font-medium transition-colors"
             >
               Permissions <ChevronRight size={15} />
             </button>
@@ -274,7 +574,7 @@ export default function UploadPage() {
         </div>
       )}
 
-      {/* ── Step 2: Permissions ───────────────────────────────────────── */}
+      {/* ── Step 3: Permissions ───────────────────────────────────────── */}
       {step === 'permissions' && (
         <div className="space-y-5">
           <div>
@@ -342,20 +642,26 @@ export default function UploadPage() {
                   <input
                     type="text"
                     value={perm.role}
-                    onChange={e => updatePermission(idx, 'role', e.target.value)}
+                    onChange={e => updatePermissionRole(idx, e.target.value)}
                     placeholder="Role name"
-                    className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-40 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <select
-                    value={perm.capability}
-                    onChange={e => updatePermission(idx, 'capability', e.target.value)}
-                    className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="read">read</option>
-                    <option value="update">update</option>
-                    <option value="insert">insert</option>
-                    <option value="execute">execute</option>
-                  </select>
+                  <div className="flex rounded-md border border-gray-300 dark:border-gray-600 overflow-hidden flex-shrink-0">
+                    {ALL_CAPS.map(cap => (
+                      <button
+                        key={cap}
+                        type="button"
+                        onClick={() => toggleCapability(idx, cap)}
+                        className={`px-2.5 py-1.5 text-xs font-medium border-r last:border-r-0 border-gray-300 dark:border-gray-600 transition-colors ${
+                          perm.capabilities.has(cap)
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {cap}
+                      </button>
+                    ))}
+                  </div>
                   <button onClick={() => removePermission(idx)} className="flex items-center justify-center w-7 h-7 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors flex-shrink-0" title="Remove permission"><X size={13} /></button>
                 </div>
               ))}
@@ -367,7 +673,7 @@ export default function UploadPage() {
 
           <div className="flex justify-between pt-2">
             <button
-              onClick={() => setStep('upload')}
+              onClick={() => setStep('preview')}
               className="flex items-center gap-1.5 px-4 py-2 rounded-md border border-gray-400 dark:border-white/25 bg-gray-100 dark:bg-transparent text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 hover:border-gray-500 dark:hover:border-white/50 transition-colors"
             >
               <ChevronLeft size={15} /> Back
@@ -383,7 +689,7 @@ export default function UploadPage() {
         </div>
       )}
 
-      {/* ── Step 3: Summary ──────────────────────────────────────────── */}
+      {/* ── Step 4: Summary ──────────────────────────────────────────── */}
       {step === 'summary' && (
         <div className="space-y-4">
           {/* Files */}
@@ -441,10 +747,10 @@ export default function UploadPage() {
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {permissions.filter(p => p.role.trim()).map((p, idx) => (
-                    <span key={idx} className="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-700 px-2.5 py-1 text-xs text-gray-700 dark:text-gray-300">
+                    <span key={idx} className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-700 px-2.5 py-1 text-xs text-gray-700 dark:text-gray-300">
                       <span className="font-medium">{p.role}</span>
                       <span className="text-gray-400">·</span>
-                      <span>{p.capability}</span>
+                      <span>{[...p.capabilities].join(', ')}</span>
                     </span>
                   ))}
                 </div>
@@ -477,7 +783,7 @@ export default function UploadPage() {
         </div>
       )}
 
-      {/* ── Step 4: Results ──────────────────────────────────────────── */}
+      {/* ── Step 5: Results ──────────────────────────────────────────── */}
       {step === 'results' && result && (
         <div className="space-y-5">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

@@ -51,6 +51,8 @@ declare variable $ELEMENT_ATTRIBUTE_FREQUENCY  := map:map();
 declare variable $ELEMENT_ATTRIBUTE_VALUES     := map:map();
 declare variable $ELEMENT_ATTRIBUTE_XPATHS     := map:map();
 
+declare variable $ELEMENT_NODE_KIND            := map:map();
+
 declare variable $ATTRIBUTE_FREQUENCY          := map:map();
 declare variable $ATTRIBUTE_VALUES             := map:map();
 declare variable $ATTRIBUTE_XPATHS             := map:map();
@@ -183,9 +185,15 @@ declare function a:analyze-json($objects as node()*) {
         let $_ := $ELEMENT_FREQUENCY=>map:put($prop-key, ($ELEMENT_FREQUENCY=>map:get($prop-key),0)[1] + 1)
         let $_ := $ELEMENT_XPATHS=>map:put($prop-key, ($ELEMENT_XPATHS=>map:get($prop-key),$xpath))
         return
-          if($prop instance of object-node() or $prop instance of array-node())
+          if($prop instance of object-node())
           then (
-            map:put($ELEMENT_VALUES,$prop-key,($ELEMENT_VALUES=>map:get($prop-key),$COMPLEX_VALUE)),
+            map:put($ELEMENT_VALUES,$prop-key,($ELEMENT_VALUES=>map:get($prop-key),xdmp:node-kind($prop))),
+            map:put($ELEMENT_NODE_KIND,$prop-key,"object-node"),
+            a:analyze-json($prop)
+          ) else if($prop instance of array-node())
+          then (
+            map:put($ELEMENT_VALUES,$prop-key,($ELEMENT_VALUES=>map:get($prop-key),xdmp:node-kind($prop))),
+            map:put($ELEMENT_NODE_KIND,$prop-key,"array-node"),
             a:analyze-json($prop)
           )
           else
@@ -325,9 +333,10 @@ let $_ :=
      map:clear($ELEMENT_ATTRIBUTE_VALUES),     
      map:clear($ATTRIBUTE_FREQUENCY),          
      map:clear($ATTRIBUTE_VALUES),             
-     map:clear($VALUE_QNAME),                  
-     map:clear($NAMESPACE_PREFIX),             
-     map:clear($NAMESPACE_VALUES)
+     map:clear($VALUE_QNAME),
+     map:clear($NAMESPACE_PREFIX),
+     map:clear($NAMESPACE_VALUES),
+     map:clear($ELEMENT_NODE_KIND)
    ) 
    let $_ := for $n in $node return (a:document-stat($n),a:analyze($n))
    let $stats-map := map:map()
@@ -380,6 +389,7 @@ let $_ :=
          element frequency{$e},
          element distinct-values {map:count($values-map)},
          element infered-types{$infered-type},
+         element node-kind{(map:get($ELEMENT_NODE_KIND,$k),"")[1]},
          element min-length{fn:min($string-lengths)},
          element max-length{fn:min($string-lengths)},
          element average-length {fn:ceiling(fn:avg($string-lengths))},

@@ -148,6 +148,7 @@ public class MarkLogicService {
             node.put("frequency", child(el, "frequency"));
             node.put("distinctValues", child(el, "distinct-values"));
             node.put("inferedTypes", child(el, "infered-types"));
+            node.put("nodeKind", child(el, "node-kind"));
             node.put("minLength", child(el, "min-length"));
             node.put("maxLength", child(el, "max-length"));
             node.put("averageLength", child(el, "average-length"));
@@ -308,6 +309,7 @@ public class MarkLogicService {
             Node documentNode = resultNodes.item(i);
             documentMap.put("uri",documentNode.getAttributes().getNamedItem("uri").getTextContent());
             documentMap.put("type",documentNode.getAttributes().getNamedItem("type").getTextContent());
+            documentMap.put("collections",documentNode.getAttributes().getNamedItem("collections").getTextContent().split(","));
             documentMap.put("content",resultNodes.item(i).getTextContent());
             results.add(documentMap);
         }
@@ -341,6 +343,151 @@ public class MarkLogicService {
         result.put("xpath", child(el, "xpath"));
         result.put("database", child(el, "database"));
         return result;
+    }
+
+    // ── Search Options ────────────────────────────────────────────────────────
+
+    public List<Map<String, Object>> listSearchOptions(String db, String analysisId) {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("rs:action", "list");
+        params.put("rs:db", db);
+        if (analysisId != null && !analysisId.isEmpty()) params.put("rs:analysis-id", analysisId);
+        String json = get("/v1/resources/search-options", params);
+        return parseJsonOptionsList(json);
+    }
+
+    public Map<String, Object> saveSearchOptions(String db, String analysisId, String name, String optionsJson) {
+        String response = post("/v1/resources/search-options",
+                formOf("action", "save", "db", db,
+                        "analysis-id", analysisId != null ? analysisId : "",
+                        "name", name,
+                        "options", optionsJson));
+        // response is JSON {"id":"..."}
+        Map<String, Object> result = new LinkedHashMap<>();
+        String id = extractJsonString(response, "id");
+        result.put("id", id);
+        return result;
+    }
+
+    public Map<String, Object> updateSearchOptions(String id, String name, String optionsJson) {
+        String response = post("/v1/resources/search-options",
+                formOf("action", "update", "id", id,
+                        "name", name, "options", optionsJson));
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", extractJsonString(response, "id"));
+        return result;
+    }
+
+    public void deleteSearchOptions(String id) {
+        post("/v1/resources/search-options", formOf("action", "delete", "id", id));
+    }
+
+    public Map<String, Object> getSearchOptions(String id) {
+        String json = get("/v1/resources/search-options", Map.of("rs:action", "get", "rs:id", id));
+        return parseJsonObject(json);
+    }
+
+    // ── Search Execute ────────────────────────────────────────────────────────
+
+    public Map<String, Object> executeSearch(String db, String optionsId, String query, int page, int pageSize) {
+        String xml = post("/v1/resources/search",
+                formOf("db", db, "options-id", optionsId,
+                        "query", query != null ? query : "",
+                        "page", String.valueOf(page),
+                        "pageSize", String.valueOf(pageSize)));
+        Document doc = parse(xml);
+        Element root = doc.getDocumentElement();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("valid", "true".equals(child(root, "valid")));
+        result.put("error", child(root, "error"));
+        result.put("estimate", child(root, "estimate"));
+        result.put("page", page);
+        result.put("pageSize", pageSize);
+
+        // Parse facets
+        List<Map<String, Object>> facets = new ArrayList<>();
+        NodeList facetNodes = root.getElementsByTagName("facet");
+        for (int i = 0; i < facetNodes.getLength(); i++) {
+            Element f = (Element) facetNodes.item(i);
+            Map<String, Object> facet = new LinkedHashMap<>();
+            facet.put("name", f.getAttribute("name"));
+            List<Map<String, Object>> values = new ArrayList<>();
+            NodeList valNodes = f.getElementsByTagName("value");
+            for (int j = 0; j < valNodes.getLength(); j++) {
+                Element v = (Element) valNodes.item(j);
+                Map<String, Object> val = new LinkedHashMap<>();
+                val.put("name", v.getAttribute("name"));
+                val.put("count", v.getAttribute("count"));
+                values.add(val);
+            }
+            facet.put("values", values);
+            facets.add(facet);
+        }
+        result.put("facets", facets);
+
+        // Parse results (same shape as executeQueryResults)
+        List<Map<String, Object>> results = new ArrayList<>();
+        NodeList resultNodes = root.getElementsByTagName("result");
+        for (int i = 0; i < resultNodes.getLength(); i++) {
+            Node n = resultNodes.item(i);
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("uri", n.getAttributes().getNamedItem("uri").getTextContent());
+            r.put("type", n.getAttributes().getNamedItem("type").getTextContent());
+            String cols = n.getAttributes().getNamedItem("collections").getTextContent();
+            r.put("collections", cols.isEmpty() ? new String[0] : cols.split(","));
+            r.put("content", n.getTextContent());
+            results.add(r);
+        }
+        result.put("results", results);
+        return result;
+    }
+
+    // ── JSON helpers ──────────────────────────────────────────────────────────
+
+    private List<Map<String, Object>> parseJsonOptionsList(String json) {
+        List<Map<String, Object>> list = new ArrayList<>();
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(json);
+            com.fasterxml.jackson.databind.JsonNode opts = root.get("options");
+            if (opts != null && opts.isArray()) {
+                for (com.fasterxml.jackson.databind.JsonNode n : opts) {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id",         n.path("id").asText(""));
+                    m.put("name",       n.path("name").asText(""));
+                    m.put("database",   n.path("database").asText(""));
+                    m.put("analysisId", n.path("analysisId").asText(""));
+                    m.put("createdAt",  n.path("createdAt").asText(""));
+                    list.add(m);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse search options list: {}", e.getMessage());
+        }
+        return list;
+    }
+
+    private Map<String, Object> parseJsonObject(String json) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(json);
+            Map<String, Object> m = new LinkedHashMap<>();
+            root.fields().forEachRemaining(e -> m.put(e.getKey(), e.getValue().isTextual() ? e.getValue().asText() : e.getValue().toString()));
+            return m;
+        } catch (Exception e) {
+            log.warn("Failed to parse JSON object: {}", e.getMessage());
+            return new LinkedHashMap<>();
+        }
+    }
+
+    private String extractJsonString(String json, String field) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            return mapper.readTree(json).path(field).asText("");
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     // ── Notifications ─────────────────────────────────────────────────────────

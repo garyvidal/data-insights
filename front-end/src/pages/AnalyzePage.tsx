@@ -23,50 +23,39 @@ import QueryPanel from '../components/QueryPanel'
 type Tab = 'structure'
 
 /**
- * Convert a raw MarkLogic analysis XPath (simple slash-path) into the correct
- * MarkLogic JSON-aware step syntax for use in cts:search / XPath expressions.
+ * Build the fn:collection() XPath scope expression for the Query Panel when a
+ * node is selected in the analysis grid.
  *
- * Rules:
- *  - JSON object node  → object-node('localname')
- *  - JSON array node   → array-node('localname')
- *  - Any name with spaces → must use object-node() / array-node() quoted form
- *  - XML element / attribute → left as-is (already valid XPath)
+ * XML:  fn:collection()[element-name]
+ * JSON: fn:collection()[object-node("element-name")]
  *
- * The node's `inferedTypes` from MarkLogic contains hints like "object", "array",
- * "json-object", "json-array". The `type` field is "element" | "attribute".
- * JSON nodes come through with type="element" but inferedTypes containing "object"/"array".
+ * documentType drives the choice; inferedTypes on the node is used as a
+ * secondary signal when documentType is ambiguous.
  */
-function toMarkLogicXPath(node: AnalysisNode): string {
-  const infered = (node.inferedTypes || '').toLowerCase()
+function toQueryPanelXPath(node: AnalysisNode, documentType: string): string {
   const localname = node.localname || ''
-  const isJsonObject = infered.includes('object') || infered.includes('json-object')
-  const isJsonArray  = infered.includes('array')  || infered.includes('json-array')
-  const hasSpaces    = localname.includes(' ')
+  const nodeKind  = (node.nodeKind || '').toLowerCase()
+  const infered   = (node.inferedTypes || '').toLowerCase()
 
-  // Attribute nodes — XPath is already correct (/@attrname)
-  if (node.type === 'attribute') return node.xpath || ''
+  // nodeKind from MarkLogic is the authoritative signal for JSON object/array
+  if (nodeKind === 'array') {
+    return `fn:collection()[array-node("${localname}")]`
+  }
+  if (nodeKind === 'object') {
+    return `fn:collection()[object-node("${localname}")]`
+  }
 
-  // If neither JSON hint nor spaces, return the raw xpath as-is (XML element)
-  if (!isJsonObject && !isJsonArray && !hasSpaces) return node.xpath || ''
+  // Fall back to documentType / inferedTypes heuristic for plain JSON fields
+  const isJson = documentType === 'json'
+              || infered.includes('object')
+              || infered.includes('json-object')
+              || infered.includes('array')
+              || infered.includes('json-array')
 
-  // Rebuild from the raw xpath, rewriting each step that corresponds to this
-  // node's localname using the appropriate MarkLogic JSON step function.
-  // The raw xpath looks like: /root/parent/localname
-  const rawPath = node.xpath || ''
-  const steps = rawPath.split('/')
-
-  const rewritten = steps.map((step, i) => {
-    if (step === '') return '' // leading slash produces empty first element
-    // Only rewrite the final step — that's the node itself
-    // (parent steps are XML or already correct)
-    if (i === steps.length - 1) {
-      if (isJsonArray) return `array-node('${step}')`
-      if (isJsonObject || hasSpaces) return `object-node('${step}')`
-    }
-    return step
-  })
-
-  return rewritten.join('/')
+  if (isJson) {
+    return `fn:collection()[object-node("${localname}")]`
+  }
+  return `fn:collection()[${localname}]`
 }
 
 function fileSizeFormat(bytes: string | number): string {
@@ -657,7 +646,10 @@ export default function AnalyzePage() {
         <QueryPanel
           db={selectedDb}
           analysisId={selectedAnalysis}
-          selectedXPath={selectedNode ? toMarkLogicXPath(selectedNode) : undefined}
+          selectedXPath={selectedNode ? toQueryPanelXPath(
+          selectedNode,
+          analyses.find(a => a.analysisId === selectedAnalysis)?.documentType ?? ''
+        ) : undefined}
         />
       )}
     </div>

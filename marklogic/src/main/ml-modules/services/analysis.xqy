@@ -71,7 +71,7 @@ declare function resource:recurse($current, $elems, $attrs, $meta, $nss, $depth,
                     else fn:data($current/parent-key)}-{$depth - 1}</parent-key>
                 <child-key>{fn:data($current/child-key)}</child-key>
                 <parent-child-key>{fn:data($current/key)}</parent-child-key>
-                <type>element</type>
+                <type>{$current/type}</type>
                 <namespace>{fn:data($current/child-namespace)}</namespace>
                 <localname>{$prefix}{fn:data($current/child-localname)}</localname>
                 <min-distance>{fn:data($current/min-distance)}</min-distance>
@@ -79,6 +79,7 @@ declare function resource:recurse($current, $elems, $attrs, $meta, $nss, $depth,
                 <frequency>{fn:data($current/frequency)}</frequency>
                 <distinct-values>{fn:data($current/distinct-values)}</distinct-values>
                 <infered-types>{""}</infered-types>
+                <node-kind>{fn:data($curmeta/node-kind)}</node-kind>
                 <min-length>{fn:data($current/min-length)}</min-length>
                 <max-length>{fn:data($current/max-length)}</max-length>
                 <average-length>{fn:data($current/average-length)}</average-length>
@@ -115,6 +116,7 @@ declare function resource:recurse($current, $elems, $attrs, $meta, $nss, $depth,
                 <frequency>{fn:data($current/frequency)}</frequency>
                 <distinct-values>{fn:data($current/distinct-values)}</distinct-values>
                 <infered-types>{fn:data($current/infered-types)}</infered-types>
+                <node-kind>{fn:data($curmeta/node-kind)}</node-kind>
                 <min-length>{fn:data($current/min-length)}</min-length>
                 <max-length>{fn:data($current/max-length)}</max-length>
                 <average-length>{fn:data($current/average-length)}</average-length>

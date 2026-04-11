@@ -119,6 +119,19 @@ function ResultCard({
         <span className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate flex-1" title={result.uri}>
           {result.uri}
         </span>
+        {result.collections && result.collections.length > 0 && (
+          <span className="flex items-center gap-1 flex-shrink-0 flex-wrap">
+            {result.collections.map((col, ci) => (
+              <span
+                key={ci}
+                className="text-xs font-mono px-1.5 py-0.5 rounded bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300"
+                title={col}
+              >
+                {col.split('/').filter(Boolean).pop() ?? col}
+              </span>
+            ))}
+          </span>
+        )}
       </button>
 
       {/* Result content */}
