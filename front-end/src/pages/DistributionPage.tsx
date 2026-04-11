@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
-import { useDatabase } from '../context/DatabaseContext'
+import { useDatabase } from '../context/useDatabase'
 import { useTheme } from '../context/ThemeContext'
 import { getRootElements } from '../services/api'
 import type { RootElement } from '../types'

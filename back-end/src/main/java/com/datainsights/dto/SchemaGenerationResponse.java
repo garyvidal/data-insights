@@ -13,6 +13,7 @@ public class SchemaGenerationResponse {
     private String analysisId;
     private String database;
     private String schemaType;
+    private String name;
     private String schema;
     private LocalDateTime generatedAt;
     private long documentCount;

@@ -16,6 +16,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 
@@ -111,6 +112,7 @@ public class MarkLogicService {
             a.put("analysisName", child(el, "analysis-name"));
             a.put("database", child(el, "database"));
             a.put("localname", child(el, "localname"));
+            a.put("documentType", child(el, "type"));
             list.add(a);
         }
         return list;
@@ -159,13 +161,15 @@ public class MarkLogicService {
         return nodes;
     }
 
-    public Map<String, Object> getAnalysisValues(String analysisId, String nodeId, String type, int page, int rows) {
+    public Map<String, Object> getAnalysisValues(String analysisId, String nodeId, String type, int page, int rows, String sortCol, String sortDir) {
         Map<String, String> params = new LinkedHashMap<>();
         params.put("rs:type", type);
         params.put("rs:analysis-id", analysisId);
         params.put("rs:id", nodeId);
         params.put("rs:page", String.valueOf(page));
         params.put("rs:rows", String.valueOf(rows));
+        if (sortCol != null && !sortCol.isEmpty()) params.put("rs:sidx", sortCol);
+        if (sortDir != null && !sortDir.isEmpty()) params.put("rs:sord", sortDir);
         String xml = get("/v1/resources/analysis", params);
         return parsePaginatedValues(xml, "value", "key", "frequency");
     }
@@ -277,6 +281,65 @@ public class MarkLogicService {
         result.put("valid", "true".equals(child(doc.getDocumentElement(), "valid")));
         result.put("count", child(doc.getDocumentElement(), "count"));
         result.put("error", child(doc.getDocumentElement(), "error"));
+        return result;
+    }
+
+    public Map<String, Object> executeQueryResults(String db, String query, String xpath,
+                                                    String analysisId, int page, int pageSize) {
+        String xml = post("/v1/resources/eval-xpath",
+                formOf("rs:db", db, "rs:query", query, "rs:xpath", xpath,
+                        "rs:analysis-id", analysisId != null ? analysisId : "",
+                        "rs:page", String.valueOf(page),
+                        "rs:pageSize", String.valueOf(pageSize)));
+        Document doc = parse(xml);
+        Element root = doc.getDocumentElement();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("valid", "true".equals(child(root, "valid")));
+        result.put("error", child(root, "error"));
+        result.put("estimate", child(root, "estimate"));
+        result.put("page", page);
+        result.put("pageSize", pageSize);
+
+        List<Map<String,Object>> results = new ArrayList<>();
+        NodeList resultNodes = root.getElementsByTagName("result");
+        for (int i = 0; i < resultNodes.getLength(); i++) {
+            Map<String,Object> documentMap = new LinkedHashMap<>();
+            Node documentNode = resultNodes.item(i);
+            documentMap.put("uri",documentNode.getAttributes().getNamedItem("uri").getTextContent());
+            documentMap.put("type",documentNode.getAttributes().getNamedItem("type").getTextContent());
+            documentMap.put("content",resultNodes.item(i).getTextContent());
+            results.add(documentMap);
+        }
+        result.put("results", results);
+        return result;
+    }
+
+    public Map<String, Object> saveExpression(String db, String name, String query, String xpath) {
+        String xml = post("/v1/resources/expressions",
+                formOf("rs:action", "save", "rs:db", db,
+                        "rs:name", name, "rs:query", query, "rs:xpath", xpath));
+        Document doc = parse(xml);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", child(doc.getDocumentElement(), "id"));
+        return result;
+    }
+
+    public void deleteExpression(String id) {
+        post("/v1/resources/expressions",
+                formOf("rs:action", "delete", "rs:id", id));
+    }
+
+    public Map<String, Object> getExpression(String id) {
+        String xml = get("/v1/resources/expressions", Map.of("rs:action", "get", "rs:id", id));
+        Document doc = parse(xml);
+        Element el = doc.getDocumentElement();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", child(el, "id"));
+        result.put("name", child(el, "name"));
+        result.put("query", child(el, "query"));
+        result.put("xpath", child(el, "xpath"));
+        result.put("database", child(el, "database"));
         return result;
     }
 

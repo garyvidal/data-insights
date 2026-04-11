@@ -1,0 +1,9 @@
+<rapi:metadata xmlns:rapi="http://marklogic.com/rest-api">
+  <rapi:title>notifications</rapi:title>
+  <rapi:version>1.0</rapi:version>
+  <rapi:methods>
+    <rapi:method>
+      <rapi:method-name>GET</rapi:method-name>
+    </rapi:method>
+  </rapi:methods>
+</rapi:metadata>

@@ -3,11 +3,15 @@ server:
 
 marklogic:
   host: localhost
-  port: 9090 # MarkLogic REST API server port (default 8000)
+  port: 9091 # MarkLogic REST API server port (default 8000)
   username: admin
   password: admin
 
 spring:
+  servlet:
+    multipart:
+      max-file-size: 512MB
+      max-request-size: 512MB
   web:
     resources:
       add-mappings: true

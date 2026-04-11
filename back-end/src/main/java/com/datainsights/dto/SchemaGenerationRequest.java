@@ -13,4 +13,6 @@ public class SchemaGenerationRequest {
     private String schemaType;
     private boolean strict;
     private String name;
+    /** JSON Schema draft version: "draft-07" (default) or "2019-09" */
+    private String draft;
 }

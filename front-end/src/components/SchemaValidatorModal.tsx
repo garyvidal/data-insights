@@ -1,4 +1,8 @@
-﻿import { useState } from "react";
+import { useState } from "react";
+import CodeMirror from "@uiw/react-codemirror";
+import { json } from "@codemirror/lang-json";
+import { xml } from "@codemirror/lang-xml";
+import { useTheme } from "../context/ThemeContext";
 import type { ValidationResult, ValidationRequest } from "../types";
 import * as api from "../services/api";
 import { ValidationResultsDisplay } from "./ValidationResultsDisplay";
@@ -16,6 +20,7 @@ export function SchemaValidatorModal({
   isOpen,
   onClose,
 }: SchemaValidatorModalProps) {
+  const { theme } = useTheme();
   const [documentContent, setDocumentContent] = useState("");
   const [documentType, setDocumentType] = useState<"json" | "xml">("json");
   const [loading, setLoading] = useState(false);
@@ -25,7 +30,6 @@ export function SchemaValidatorModal({
   const handleValidate = async () => {
     setLoading(true);
     setError(null);
-
     try {
       const request: ValidationRequest = {
         schemaId,
@@ -33,7 +37,6 @@ export function SchemaValidatorModal({
         document: documentContent,
         documentType,
       };
-
       const result = await api.validateDocument(request);
       setValidationResult(result);
     } catch (err) {
@@ -43,77 +46,106 @@ export function SchemaValidatorModal({
     }
   };
 
+  const handleReset = () => {
+    setValidationResult(null);
+    setDocumentContent("");
+    setError(null);
+  };
+
   if (!isOpen) return null;
 
+  const extensions = documentType === "xml" ? [xml()] : [json()];
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-lg p-6 max-w-2xl w-full max-h-96 overflow-y-auto">
-        <h2 className="text-xl font-bold mb-4 text-slate-900 dark:text-white">
-          Validate Document
-        </h2>
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl flex flex-col w-full max-w-4xl h-[85vh]">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Validate Document</h2>
+          <button
+            onClick={onClose}
+            className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white text-xl leading-none"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
 
         {!validationResult ? (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+          <div className="flex flex-col flex-1 overflow-hidden">
+            {/* Controls */}
+            <div className="flex items-center gap-4 px-5 py-3 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 Document Type
               </label>
               <select
                 value={documentType}
                 onChange={(e) => setDocumentType(e.target.value as "json" | "xml")}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
               >
                 <option value="json">JSON</option>
                 <option value="xml">XML</option>
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Document Content
-              </label>
-              <textarea
+            {/* Editor — fills remaining height */}
+            <div className="flex-1 overflow-hidden">
+              <CodeMirror
                 value={documentContent}
-                onChange={(e) => setDocumentContent(e.target.value)}
-                placeholder={documentType === "json" ? "Enter JSON document" : "Enter XML document"}
-                className="w-full h-48 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md font-mono text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                onChange={setDocumentContent}
+                extensions={extensions}
+                theme={theme === "dark" ? "dark" : "light"}
+                placeholder={documentType === "json" ? '{\n  "key": "value"\n}' : "<root>\n  <element/>\n</root>"}
+                basicSetup={{
+                  lineNumbers: true,
+                  foldGutter: true,
+                  highlightActiveLine: true,
+                }}
+                style={{ height: "100%", fontSize: "13px" }}
+                height="100%"
               />
             </div>
 
-            {error && <div className="p-3 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 rounded">{error}</div>}
-
-            <div className="flex gap-3">
-              <button
-                onClick={onClose}
-                className="flex-1 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded hover:bg-slate-300 dark:hover:bg-slate-600"
-              >
-                Close
-              </button>
-              <button
-                onClick={handleValidate}
-                disabled={loading || !documentContent.trim()}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-              >
-                {loading ? "Validating..." : "Validate"}
-              </button>
+            {/* Error + actions */}
+            <div className="flex-shrink-0 px-5 py-3 border-t border-slate-200 dark:border-slate-700 space-y-3">
+              {error && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded text-sm">
+                  {error}
+                </div>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={onClose}
+                  className="flex-1 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded hover:bg-slate-300 dark:hover:bg-slate-600 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleValidate}
+                  disabled={loading || !documentContent.trim()}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
+                >
+                  {loading ? "Validating…" : "Validate"}
+                </button>
+              </div>
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
-            <ValidationResultsDisplay result={validationResult} />
-            <div className="flex gap-3">
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              <ValidationResultsDisplay result={validationResult} />
+            </div>
+            <div className="flex gap-3 px-5 py-3 border-t border-slate-200 dark:border-slate-700 flex-shrink-0">
               <button
-                onClick={() => {
-                  setValidationResult(null);
-                  setDocumentContent("");
-                }}
-                className="flex-1 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded hover:bg-slate-300 dark:hover:bg-slate-600"
+                onClick={handleReset}
+                className="flex-1 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded hover:bg-slate-300 dark:hover:bg-slate-600 text-sm"
               >
                 Validate Another
               </button>
               <button
                 onClick={onClose}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
               >
                 Close
               </button>

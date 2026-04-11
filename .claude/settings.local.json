@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(npm list:*)",
-      "Bash(grep -r \"xdmp:\" /c/Users/garyv/Workspace/data-insights/marklogic/src/main/ml-modules/*.xqy)"
+      "Bash(grep -r \"xdmp:\" /c/Users/garyv/Workspace/data-insights/marklogic/src/main/ml-modules/*.xqy)",
+      "Bash(git tag:*)",
+      "Bash(git push:*)",
+      "Bash(wc -l back-end/src/main/java/com/datainsights/**/*.java)",
+      "Read(//c/projects/DataAnalyzer/content-analyzer/**)"
     ]
   }
 }

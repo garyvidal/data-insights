@@ -1,4 +1,4 @@
-import { useDatabase } from '../context/DatabaseContext'
+import { useDatabase } from '../context/useDatabase'
 
 export default function DatabaseSelector() {
   const { databases, selectedDb, setSelectedDb, loading } = useDatabase()

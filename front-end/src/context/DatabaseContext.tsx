@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { getDatabases } from '../services/api'
 
@@ -9,7 +9,7 @@ interface DatabaseContextValue {
   loading: boolean
 }
 
-const DatabaseContext = createContext<DatabaseContextValue | null>(null)
+export const DatabaseContext = createContext<DatabaseContextValue | null>(null)
 
 export function DatabaseProvider({ children }: { children: ReactNode }) {
   const [databases, setDatabases] = useState<string[]>([])
@@ -41,8 +41,3 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
   )
 }
 
-export function useDatabase() {
-  const ctx = useContext(DatabaseContext)
-  if (!ctx) throw new Error('useDatabase must be used within DatabaseProvider')
-  return ctx
-}

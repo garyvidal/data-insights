@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useDatabase } from '../context/DatabaseContext'
+import { useDatabase } from '../context/useDatabase'
 import { getAnalysisList } from '../services/api'
 import type { Analysis } from '../types'
 

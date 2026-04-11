@@ -25,6 +25,7 @@ export interface Analysis {
   analysisName: string
   database: string
   localname: string
+  documentType: 'json' | 'xml' | string
 }
 
 export interface AnalysisNode {
@@ -81,6 +82,9 @@ export interface Namespace {
 export interface Expression {
   id: string
   name: string
+  query?: string
+  xpath?: string
+  database?: string
 }
 
 export interface RunAnalysisRequest {
@@ -106,6 +110,8 @@ export interface SchemaGenerationRequest {
   schemaType: 'json-schema' | 'xsd'
   strict: boolean
   name?: string
+  /** JSON Schema draft: "draft-07" (default) or "2019-09" */
+  draft?: 'draft-07' | '2019-09'
 }
 
 export interface SchemaGenerationResponse {
@@ -113,6 +119,7 @@ export interface SchemaGenerationResponse {
   analysisId: string
   database: string
   schemaType: 'json-schema' | 'xsd'
+  name?: string
   schema: string
   generatedAt: string
   documentCount: number
@@ -150,4 +157,25 @@ export interface SchemaInfo {
   database: string
   documentCount: number
   createdAt: string
+}
+
+// ── Upload Types ──────────────────────────────────────────────────────────
+
+export interface UploadError {
+  file: string
+  error: string
+}
+
+export interface UploadResult {
+  totalFiles: number
+  inserted: number
+  skipped: number
+  failed: number
+  byType: Record<string, number>
+  errors: UploadError[]
+}
+
+export interface UploadPermission {
+  role: string
+  capability: 'read' | 'update' | 'insert' | 'execute'
 }

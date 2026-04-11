@@ -36,7 +36,7 @@ jobs:
       uses: actions/upload-artifact@v4
       if: success()
       with:
-        name: backend-jar
+        name: data-insights
         path: back-end/target/*.jar
         retention-days: 5
     

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useDatabase } from '../context/DatabaseContext'
+import { useDatabase } from '../context/useDatabase'
 import { getAnalysisStatus, getDatabaseStats } from '../services/api'
 import type { AnalysisStatus, DatabaseStats } from '../types'
 

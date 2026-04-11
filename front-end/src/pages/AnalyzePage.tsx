@@ -1,6 +1,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { useDatabase } from '../context/DatabaseContext'
+import { Play, Wand2, Trash2, FolderX } from 'lucide-react'
+import { useDatabase } from '../context/useDatabase'
 import {
   clearAnalyses,
   deleteAnalysis,
@@ -9,15 +10,64 @@ import {
   getAnalysisUris,
   getAnalysisValues,
   getDocStats,
+  getNamespaces,
 } from '../services/api'
-import type { Analysis, AnalysisNode, DocStats, PaginatedResult, UriRow, ValueRow } from '../types'
+import type { Analysis, AnalysisNode, DocStats, Namespace, PaginatedResult, UriRow, ValueRow } from '../types'
 import AlertDialog from '../components/AlertDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
 import LoadingOverlay from '../components/LoadingOverlay'
 import RunAnalysisModal from '../components/RunAnalysisModal'
 import { SchemaGeneratorModal } from '../components/SchemaGeneratorModal'
+import QueryPanel from '../components/QueryPanel'
 
 type Tab = 'structure'
+
+/**
+ * Convert a raw MarkLogic analysis XPath (simple slash-path) into the correct
+ * MarkLogic JSON-aware step syntax for use in cts:search / XPath expressions.
+ *
+ * Rules:
+ *  - JSON object node  → object-node('localname')
+ *  - JSON array node   → array-node('localname')
+ *  - Any name with spaces → must use object-node() / array-node() quoted form
+ *  - XML element / attribute → left as-is (already valid XPath)
+ *
+ * The node's `inferedTypes` from MarkLogic contains hints like "object", "array",
+ * "json-object", "json-array". The `type` field is "element" | "attribute".
+ * JSON nodes come through with type="element" but inferedTypes containing "object"/"array".
+ */
+function toMarkLogicXPath(node: AnalysisNode): string {
+  const infered = (node.inferedTypes || '').toLowerCase()
+  const localname = node.localname || ''
+  const isJsonObject = infered.includes('object') || infered.includes('json-object')
+  const isJsonArray  = infered.includes('array')  || infered.includes('json-array')
+  const hasSpaces    = localname.includes(' ')
+
+  // Attribute nodes — XPath is already correct (/@attrname)
+  if (node.type === 'attribute') return node.xpath || ''
+
+  // If neither JSON hint nor spaces, return the raw xpath as-is (XML element)
+  if (!isJsonObject && !isJsonArray && !hasSpaces) return node.xpath || ''
+
+  // Rebuild from the raw xpath, rewriting each step that corresponds to this
+  // node's localname using the appropriate MarkLogic JSON step function.
+  // The raw xpath looks like: /root/parent/localname
+  const rawPath = node.xpath || ''
+  const steps = rawPath.split('/')
+
+  const rewritten = steps.map((step, i) => {
+    if (step === '') return '' // leading slash produces empty first element
+    // Only rewrite the final step — that's the node itself
+    // (parent steps are XML or already correct)
+    if (i === steps.length - 1) {
+      if (isJsonArray) return `array-node('${step}')`
+      if (isJsonObject || hasSpaces) return `object-node('${step}')`
+    }
+    return step
+  })
+
+  return rewritten.join('/')
+}
 
 function fileSizeFormat(bytes: string | number): string {
   const n = Number(bytes)
@@ -85,8 +135,10 @@ export default function AnalyzePage() {
   const [uris, setUris] = useState<PaginatedResult<UriRow> | null>(null)
   const [docStats, setDocStats] = useState<DocStats | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('structure')
-  const [rightTab, setRightTab] = useState<'values' | 'xpaths' | 'uris'>('values')
+  const [rightTab, setRightTab] = useState<'values' | 'xpaths' | 'uris' | 'namespaces'>('values')
+  const [namespaces, setNamespaces] = useState<Namespace[]>([])
   const [valuesSort, setValuesSort] = useState<{ col: 'key' | 'frequency'; dir: 'asc' | 'desc' }>({ col: 'frequency', dir: 'desc' })
+  const [valuesPage, setValuesPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [alert, setAlert] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<{ message: string; onOk: () => void } | null>(null)
@@ -168,23 +220,30 @@ export default function AnalyzePage() {
     Promise.all([
       getAnalysisStructure(selectedAnalysis, selectedDb),
       getDocStats(selectedAnalysis, selectedDb),
+      getNamespaces(selectedAnalysis),
     ])
-      .then(([structure, stats]) => {
+      .then(([structure, stats, nss]) => {
         setNodes(structure)
         setDocStats(stats)
+        setNamespaces(nss)
       })
       .catch(() => setAlert('Failed to load analysis data'))
       .finally(() => setLoading(false))
   }, [selectedAnalysis, selectedDb])
 
-  // Load values when a node is selected
+  // Load values when node, page, or sort changes; reset page when node changes
+  const prevNodeRef = useRef<typeof selectedNode>(null)
   useEffect(() => {
     if (!selectedNode || !selectedAnalysis) return
+    const nodeChanged = prevNodeRef.current !== selectedNode
+    prevNodeRef.current = selectedNode
+    const page = nodeChanged ? 1 : valuesPage
+    if (nodeChanged) setValuesPage(1)
     const type = selectedNode.type === 'attribute' ? 'attribute-values' : 'element-values'
-    getAnalysisValues(selectedAnalysis, selectedNode.parentChildKey, type)
+    getAnalysisValues(selectedAnalysis, selectedNode.parentChildKey, type, page, 50, valuesSort.col, valuesSort.dir)
       .then(setValues)
       .catch(console.error)
-  }, [selectedNode, selectedAnalysis])
+  }, [selectedNode, selectedAnalysis, valuesPage, valuesSort])
 
   // Load URIs when the uris tab is active
   useEffect(() => {
@@ -298,31 +357,31 @@ export default function AnalyzePage() {
           >
             {analyses.map(a => (
               <option key={a.analysisId} value={a.analysisId}>
-                {a.localname} [{a.analysisName}]
+                {a.documentType ? `[${a.documentType.toUpperCase()}] ` : ''}{a.localname} [{a.analysisName}]
               </option>
             ))}
           </select>
         )}
 
-        <button className="btn-primary text-sm" onClick={() => setShowRunModal(true)}>
-          Run Analysis
+        <button className="btn-primary text-sm flex items-center gap-1.5" onClick={() => setShowRunModal(true)} title="Run Analysis">
+          <Play size={14} /> Run Analysis
         </button>
 
         {selectedAnalysis && (
-          <button className="btn-primary text-sm" onClick={() => setShowSchemaModal(true)}>
-            Generate Schema
+          <button className="btn-primary text-sm flex items-center gap-1.5" onClick={() => setShowSchemaModal(true)} title="Generate Schema">
+            <Wand2 size={14} /> Generate Schema
           </button>
         )}
 
         {selectedAnalysis && (
-          <button className="btn-danger text-sm" onClick={handleDeleteAnalysis}>
-            Delete
+          <button className="btn-danger text-sm flex items-center justify-center w-8 h-8 p-0" onClick={handleDeleteAnalysis} title="Delete analysis">
+            <Trash2 size={15} />
           </button>
         )}
 
         {analyses.length > 0 && (
-          <button className="btn-danger text-sm" onClick={handleClearAllAnalyses}>
-            Clear All
+          <button className="btn-danger text-sm flex items-center justify-center w-8 h-8 p-0" onClick={handleClearAllAnalyses} title="Clear all analyses">
+            <FolderX size={15} />
           </button>
         )}
       </div>
@@ -428,7 +487,7 @@ export default function AnalyzePage() {
               >
                 {/* Sub-tabs */}
                 <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0">
-                  {(['values', 'xpaths', 'uris'] as const).map(tab => (
+                  {(['values', 'xpaths', 'uris', 'namespaces'] as const).map(tab => (
                     <button
                       key={tab}
                       onClick={() => setRightTab(tab)}
@@ -443,47 +502,68 @@ export default function AnalyzePage() {
                   ))}
                 </div>
 
-                <div className="overflow-auto flex-1 bg-white dark:bg-gray-900">
+                <div className="overflow-hidden flex flex-col flex-1 bg-white dark:bg-gray-900">
                   {rightTab === 'values' && (() => {
-                    const sorted = [...(values?.rows ?? [])].sort((a, b) => {
-                      const mul = valuesSort.dir === 'asc' ? 1 : -1
-                      if (valuesSort.col === 'frequency')
-                        return mul * (Number(a.frequency) - Number(b.frequency))
-                      return mul * a.key.localeCompare(b.key)
-                    })
+                    const rows = values?.rows ?? []
                     const toggleSort = (col: 'key' | 'frequency') =>
                       setValuesSort(s => ({ col, dir: s.col === col && s.dir === 'asc' ? 'desc' : 'asc' }))
                     const arrow = (col: 'key' | 'frequency') =>
                       valuesSort.col === col ? (valuesSort.dir === 'asc' ? ' ▲' : ' ▼') : ''
+                    const totalPages = values ? Math.ceil(values.records / 50) : 1
                     return (
-                      <div className="table-container">
-                        <table className="data-table">
-                          <thead>
-                            <tr>
-                              <th className="cursor-pointer select-none" onClick={() => toggleSort('key')}>
-                                Value{arrow('key')}
-                              </th>
-                              <th className="text-right cursor-pointer select-none" onClick={() => toggleSort('frequency')}>
-                                Count{arrow('frequency')}
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {sorted.map((v, i) => (
-                              <tr key={i}>
-                                <td className="font-mono text-xs truncate max-w-48">{v.key}</td>
-                                <td className="text-right text-xs">{v.frequency}</td>
-                              </tr>
-                            ))}
-                            {sorted.length === 0 && (
+                      <div className="flex flex-col h-full">
+                        {values && values.records > 50 && (
+                          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              Page {valuesPage} of {totalPages} ({values.records} total)
+                            </span>
+                            <div className="flex gap-1">
+                              <button
+                                disabled={valuesPage <= 1}
+                                onClick={() => setValuesPage(p => p - 1)}
+                                className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+                              >
+                                ‹ Prev
+                              </button>
+                              <button
+                                disabled={valuesPage >= totalPages}
+                                onClick={() => setValuesPage(p => p + 1)}
+                                className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+                              >
+                                Next ›
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        <div className="table-container flex-1 overflow-auto">
+                          <table className="data-table">
+                            <thead>
                               <tr>
-                                <td colSpan={2} className="text-center text-gray-400 dark:text-gray-500 py-4 text-xs">
-                                  No values
-                                </td>
+                                <th className="cursor-pointer select-none" onClick={() => toggleSort('key')}>
+                                  Value{arrow('key')}
+                                </th>
+                                <th className="text-right cursor-pointer select-none" onClick={() => toggleSort('frequency')}>
+                                  Count{arrow('frequency')}
+                                </th>
                               </tr>
-                            )}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {rows.map((v, i) => (
+                                <tr key={i}>
+                                  <td className="font-mono text-xs truncate max-w-48">{v.key}</td>
+                                  <td className="text-right text-xs">{v.frequency}</td>
+                                </tr>
+                              ))}
+                              {rows.length === 0 && (
+                                <tr>
+                                  <td colSpan={2} className="text-center text-gray-400 dark:text-gray-500 py-4 text-xs">
+                                    No values
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )
                   })()}
@@ -523,6 +603,34 @@ export default function AnalyzePage() {
                       </table>
                     </div>
                   )}
+
+                  {rightTab === 'namespaces' && (
+                    <div className="table-container">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Prefix</th>
+                            <th>Namespace URI</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {namespaces.map((ns, i) => (
+                            <tr key={i}>
+                              <td className="font-mono text-xs">{ns.prefix || <span className="text-gray-400 dark:text-gray-500 italic">default</span>}</td>
+                              <td className="font-mono text-xs truncate max-w-64">{ns.namespaceUri}</td>
+                            </tr>
+                          ))}
+                          {namespaces.length === 0 && (
+                            <tr>
+                              <td colSpan={2} className="text-center text-gray-400 dark:text-gray-500 py-4 text-xs">
+                                No namespaces
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -543,6 +651,15 @@ export default function AnalyzePage() {
           />
         )}
       </div>
+
+      {/* Query Panel — collapsible bottom drawer */}
+      {selectedDb && (
+        <QueryPanel
+          db={selectedDb}
+          analysisId={selectedAnalysis}
+          selectedXPath={selectedNode ? toMarkLogicXPath(selectedNode) : undefined}
+        />
+      )}
     </div>
   )
 }

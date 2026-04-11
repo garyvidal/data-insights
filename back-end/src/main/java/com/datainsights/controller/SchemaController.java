@@ -33,7 +33,7 @@ public class SchemaController {
         return ResponseEntity.ok(schemaService.generateXmlSchema(request));
     }
 
-    @GetMapping("/{schemaId}")
+    @GetMapping(value = "/{schemaId}", produces = "text/plain;charset=UTF-8")
     public ResponseEntity<String> getSchema(@PathVariable String schemaId) {
         String schema = schemaService.getSchema(schemaId);
         if (schema == null) {

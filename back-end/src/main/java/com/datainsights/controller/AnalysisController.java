@@ -52,8 +52,10 @@ public class AnalysisController {
             @RequestParam String id,
             @RequestParam(defaultValue = "element-values") String type,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "50") int rows) {
-        return ResponseEntity.ok(mlService.getAnalysisValues(analysisId, id, type, page, rows));
+            @RequestParam(defaultValue = "50") int rows,
+            @RequestParam(defaultValue = "frequency") String sidx,
+            @RequestParam(defaultValue = "desc") String sord) {
+        return ResponseEntity.ok(mlService.getAnalysisValues(analysisId, id, type, page, rows, sidx, sord));
     }
 
     // ── URIs ──────────────────────────────────────────────────────────────────
@@ -144,12 +146,48 @@ public class AnalysisController {
                 body.get("db"), body.get("constraint"), body.get("xpath")));
     }
 
-    // ── Execute Query ─────────────────────────────────────────────────────────
+    // ── Execute Query (count only) ────────────────────────────────────────────
 
     @PostMapping("/execute-query")
     public ResponseEntity<Map<String, Object>> executeQuery(@RequestBody Map<String, String> body) {
         return ResponseEntity.ok(mlService.executeQuery(
                 body.get("db"), body.get("query"), body.get("xpath")));
+    }
+
+    // ── Execute Query Results (paginated) ─────────────────────────────────────
+
+    @PostMapping("/query-results")
+    public ResponseEntity<Map<String, Object>> queryResults(@RequestBody Map<String, Object> body) {
+        String db = (String) body.get("db");
+        String query = (String) body.getOrDefault("query", "cts:and-query(())");
+        String xpath = (String) body.getOrDefault("xpath", "fn:collection()");
+        String analysisId = (String) body.getOrDefault("analysisId", "");
+        int page = body.containsKey("page") ? ((Number) body.get("page")).intValue() : 1;
+        int pageSize = body.containsKey("pageSize") ? ((Number) body.get("pageSize")).intValue() : 25;
+        return ResponseEntity.ok(mlService.executeQueryResults(db, query, xpath, analysisId, page, pageSize));
+    }
+
+    // ── Save Expression ───────────────────────────────────────────────────────
+
+    @PostMapping("/expressions")
+    public ResponseEntity<Map<String, Object>> saveExpression(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(mlService.saveExpression(
+                body.get("db"), body.get("name"), body.get("query"), body.get("xpath")));
+    }
+
+    // ── Get Expression ────────────────────────────────────────────────────────
+
+    @GetMapping("/expressions/{id}")
+    public ResponseEntity<Map<String, Object>> getExpression(@PathVariable String id) {
+        return ResponseEntity.ok(mlService.getExpression(id));
+    }
+
+    // ── Delete Expression ─────────────────────────────────────────────────────
+
+    @DeleteMapping("/expressions/{id}")
+    public ResponseEntity<Void> deleteExpression(@PathVariable String id) {
+        mlService.deleteExpression(id);
+        return ResponseEntity.ok().build();
     }
 
     // ── Notifications (SSE stream) ────────────────────────────────────────────
