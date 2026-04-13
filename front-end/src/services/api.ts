@@ -249,6 +249,16 @@ export const updateSearchOptions = (
 export const deleteSearchOptions = (id: string): Promise<void> =>
   api.delete(`/search-options/${id}`).then(() => undefined)
 
+export const syncIndexes = (
+  db: string,
+  constraints: string,
+  dropMissing = false,
+): Promise<{ status: string; message: string; indexed?: number }> =>
+  api.post('/indexes/sync', { db, constraints, dropMissing }).then(r => r.data)
+
+export const exportSearchOptionsXml = (id: string, name: string): Promise<string> =>
+  api.get(`/search-options/${id}/export`, { params: { name }, responseType: 'text' }).then(r => r.data)
+
 export const executeSearch = (
   db: string,
   optionsId: string,

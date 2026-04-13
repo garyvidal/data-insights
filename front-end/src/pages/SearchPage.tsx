@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Plus, Trash2, Play, ChevronDown, ChevronRight, Braces, ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react'
+import { Plus, Trash2, Play, ChevronDown, ChevronRight, Braces, ChevronLeft, ChevronRight as ChevronRightIcon, Download } from 'lucide-react'
 import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
 import { useDatabase } from '../context/useDatabase'
@@ -7,9 +7,14 @@ import { useTheme } from '../context/ThemeContext'
 import {
   getAnalysisList,
   getAnalysisStructure,
+  listSearchOptions,
   saveSearchOptions,
   updateSearchOptions,
+  deleteSearchOptions,
+  getSearchOptions,
+  syncIndexes,
   executeSearch,
+  exportSearchOptionsXml,
 } from '../services/api'
 import type {
   Analysis,
@@ -17,6 +22,7 @@ import type {
   SearchConstraint,
   SearchConstraintType,
   SearchFacet,
+  SearchOptionsSet,
   SearchResultItem,
 } from '../types'
 import LoadingOverlay from '../components/LoadingOverlay'
@@ -53,6 +59,105 @@ function buildOptionsJson(constraints: SearchConstraint[]): string {
   return JSON.stringify({ constraints }, null, 2)
 }
 
+function mlDataType(inferedTypes: string): string {
+  if (['xs:integer','xs:long','xs:unsignedLong','xs:unsignedInteger'].includes(inferedTypes)) return 'xs:int'
+  if (['xs:decimal','xs:float','xs:double'].includes(inferedTypes)) return 'xs:decimal'
+  if (inferedTypes === 'xs:date') return 'xs:date'
+  if (inferedTypes === 'xs:dateTime') return 'xs:dateTime'
+  return 'xs:string'
+}
+
+function buildOptionsXml(constraints: SearchConstraint[], name: string): string {
+  const NS = 'http://marklogic.com/appservices/search'
+  const lines: string[] = []
+  lines.push(`<?xml version="1.0" encoding="UTF-8"?>`)
+  lines.push(`<!-- Search options: ${name} -->`)
+  lines.push(`<options xmlns="${NS}">`)
+  lines.push(`  <return-results>true</return-results>`)
+  lines.push(`  <return-facets>true</return-facets>`)
+  lines.push(`  <return-estimates>true</return-estimates>`)
+  lines.push(`  <fragment-scope>documents</fragment-scope>`)
+
+  for (const c of constraints) {
+    const isJson = !c.namespace
+    const dataType = mlDataType(c.inferedTypes)
+    const collation = dataType === 'xs:string' ? ' collation="http://marklogic.com/collation/"' : ''
+    const facet = c.type === 'range' && c.facet
+    const ctype = facet ? 'range' : c.type
+
+    const facetOrderLines: string[] = []
+    if (facet) {
+      const order = c.facetOrder ?? 'frequency-descending'
+      facetOrderLines.push(`      <facet-option>limit=10</facet-option>`)
+      if (order === 'frequency-descending') { facetOrderLines.push(`      <facet-option>frequency-order</facet-option>`); facetOrderLines.push(`      <facet-option>descending</facet-option>`) }
+      else if (order === 'frequency-ascending') { facetOrderLines.push(`      <facet-option>frequency-order</facet-option>`); facetOrderLines.push(`      <facet-option>ascending</facet-option>`) }
+      else if (order === 'value-ascending') { facetOrderLines.push(`      <facet-option>item-order</facet-option>`); facetOrderLines.push(`      <facet-option>ascending</facet-option>`) }
+      else if (order === 'value-descending') { facetOrderLines.push(`      <facet-option>item-order</facet-option>`); facetOrderLines.push(`      <facet-option>descending</facet-option>`) }
+    }
+
+    lines.push(`  <constraint name="${c.name}">`)
+    if (ctype === 'range') {
+      const pathExpr = c.inferedTypes === 'xs:boolean' ? `//boolean-node("${c.localname}")` : `//text("${c.localname}")`
+      lines.push(`    <range type="${dataType}" facet="${facet}"${collation}>`)
+      if (isJson) lines.push(`      <path-index>${pathExpr}</path-index>`)
+      else        lines.push(`      <element ns="${c.namespace}" name="${c.localname}"/>`)
+      lines.push(...facetOrderLines)
+      lines.push(`    </range>`)
+    } else if (ctype === 'word') {
+      lines.push(`    <word>`)
+      if (isJson) lines.push(`      <json-property>${c.localname}</json-property>`)
+      else        lines.push(`      <element ns="${c.namespace}" name="${c.localname}"/>`)
+      lines.push(`    </word>`)
+    } else if (ctype === 'value') {
+      lines.push(`    <value>`)
+      if (isJson) lines.push(`      <json-property>${c.localname}</json-property>`)
+      else        lines.push(`      <element ns="${c.namespace}" name="${c.localname}"/>`)
+      lines.push(`    </value>`)
+    } else if (ctype === 'collection') {
+      lines.push(`    <collection facet="${facet}">`)
+      lines.push(...facetOrderLines)
+      lines.push(`    </collection>`)
+    }
+    lines.push(`  </constraint>`)
+  }
+
+  lines.push(`</options>`)
+  return lines.join('\n')
+}
+
+// ── Pretty-print helpers ──────────────────────────────────────────────────
+
+function prettyJson(raw: string): string {
+  try { return JSON.stringify(JSON.parse(raw), null, 2) } catch { return raw }
+}
+
+function prettyXml(raw: string): string {
+  try {
+    const trimmed = raw.trim()
+    let indent = 0
+    return trimmed
+      .replace(/>\s*</g, '>\n<')
+      .split('\n')
+      .map(line => {
+        const isClosing  = /^<\//.test(line)
+        const isSelfClose = /\/>$/.test(line)
+        const isProlog   = /^<\?/.test(line)
+        if (isClosing) indent = Math.max(0, indent - 1)
+        const result = '  '.repeat(indent) + line
+        if (!isClosing && !isSelfClose && !isProlog && /^<[^/]/.test(line)) indent++
+        return result
+      })
+      .join('\n')
+  } catch { return raw }
+}
+
+function prettyContent(raw: string): string {
+  const t = raw.trimStart()
+  if (t.startsWith('{') || t.startsWith('[')) return prettyJson(raw)
+  if (t.startsWith('<')) return prettyXml(raw)
+  return raw
+}
+
 // ── Result card (reused pattern from QueryPanel) ──────────────────────────
 
 function typeColor(type: string): string {
@@ -71,8 +176,10 @@ function ResultCard({
   result: SearchResultItem; index: number; expanded: boolean
   onToggle: () => void; cmTheme: 'dark' | 'light'
 }) {
-  const lang = result.content.trimStart().startsWith('{') || result.content.trimStart().startsWith('[') ? 'json' : 'xml'
-  const ext  = lang === 'json' ? [json()] : []
+  const trimmed = result.content.trimStart()
+  const lang    = trimmed.startsWith('{') || trimmed.startsWith('[') ? 'json' : 'xml'
+  const ext     = lang === 'json' ? [json()] : []
+  const content = prettyContent(result.content)
 
   return (
     <div className="border-b border-gray-200 dark:border-gray-700 last:border-0">
@@ -97,7 +204,7 @@ function ResultCard({
       {expanded && (
         <div className="border-t border-gray-200 dark:border-gray-700">
           <CodeMirror
-            value={result.content}
+            value={content}
             extensions={ext}
             theme={cmTheme}
             readOnly
@@ -170,6 +277,8 @@ export default function SearchPage() {
   const [constraints, setConstraints]       = useState<SearchConstraint[]>([])
   const [selectedOptionsId, setSelectedOptionsId] = useState('')
   const selectedOptionsIdRef = useRef('')
+  const [optionsName, setOptionsName]       = useState('default')
+  const [savedOptionsList, setSavedOptionsList] = useState<SearchOptionsSet[]>([])
   const [showJsonPreview, setShowJsonPreview] = useState(false)
   const [pickerSelected, setPickerSelected] = useState<Set<string>>(new Set())
 
@@ -183,12 +292,19 @@ export default function SearchPage() {
   const [pageSize]                          = useState(25)
   const [totalPages, setTotalPages]         = useState(1)
   const [execError, setExecError]           = useState('')
-  const [expandedRows, setExpandedRows]     = useState<Set<number>>(new Set())
+  const [expandedRows, setExpandedRows]     = useState<Set<string>>(new Set())
 
   // ── UI state ──────────────────────────────────────────────────────────
   const [loading, setLoading]               = useState(false)
   const [alert, setAlert]                   = useState<string | null>(null)
   const [confirm, setConfirm]               = useState<{ message: string; onOk: () => void } | null>(null)
+
+  // ── Load saved options list ───────────────────────────────────────────
+  function refreshOptionsList(db: string, analysisId: string) {
+    listSearchOptions(db, analysisId)
+      .then(setSavedOptionsList)
+      .catch(() => {/* silent */})
+  }
 
   // ── Load analyses ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -199,19 +315,39 @@ export default function SearchPage() {
     setConstraints([])
     setResults([])
     setFacets([])
+    setSavedOptionsList([])
+    setOptionsId('')
+    setOptionsName('default')
     getAnalysisList(selectedDb)
       .then(list => { setAnalyses(list); if (list.length > 0) setSelectedAnalysis(list[0].analysisId) })
       .catch(() => setAlert('Failed to load analysis list'))
   }, [selectedDb])
 
-  // ── Load structure when analysis changes ──────────────────────────────
+  // ── Load structure + options, then search when analysis changes ──────
   useEffect(() => {
     if (!selectedAnalysis || !selectedDb) return
+    let cancelled = false
     setLoading(true)
-    getAnalysisStructure(selectedAnalysis, selectedDb)
+
+    const structureP = getAnalysisStructure(selectedAnalysis, selectedDb)
       .then(setStructureNodes)
       .catch(() => setAlert('Failed to load analysis structure'))
-      .finally(() => setLoading(false))
+
+    const optionsP = listSearchOptions(selectedDb, selectedAnalysis)
+      .then(async list => {
+        if (cancelled) return
+        setSavedOptionsList(list)
+        if (list.length > 0 && !selectedOptionsIdRef.current) {
+          await handleLoadOptions(list[0].id)
+        }
+      })
+      .catch(() => {/* silent */})
+
+    Promise.all([structureP, optionsP])
+      .then(() => { if (!cancelled) handleSearch(1) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+
+    return () => { cancelled = true }
   }, [selectedAnalysis, selectedDb])
 
   // ── Add constraints from field picker ────────────────────────────────
@@ -225,7 +361,8 @@ export default function SearchPage() {
       namespace:    node.namespace ?? '',
       nodeKind:     node.nodeKind ?? '',
       inferedTypes: node.inferedTypes ?? '',
-      facet:        false,
+      facet:       false,
+      facetOrder:  'frequency-descending',
     }
   }
 
@@ -258,29 +395,111 @@ export default function SearchPage() {
     setSelectedOptionsId(id)
   }
 
+  // ── Save / update / delete options ───────────────────────────────────
+  async function handleSaveOptions() {
+    if (constraints.length === 0) { setAlert('Add at least one constraint before saving.'); return }
+    setLoading(true)
+    try {
+      const optionsJson = buildOptionsJson(constraints)
+      if (selectedOptionsIdRef.current) {
+        await updateSearchOptions(selectedOptionsIdRef.current, optionsName, optionsJson)
+      } else {
+        const saved = await saveSearchOptions(selectedDb, selectedAnalysis, optionsName, optionsJson)
+        setOptionsId(saved.id)
+      }
+      refreshOptionsList(selectedDb, selectedAnalysis)
+    } catch {
+      setAlert('Failed to save search options.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleLoadOptions(id: string) {
+    if (!id) { setOptionsId(''); setOptionsName('default'); setConstraints([]); return }
+    setLoading(true)
+    try {
+      const opts = await getSearchOptions(id)
+      setOptionsId(opts.id)
+      setOptionsName(opts.name)
+      // backend returns `options` as a JSON string containing { constraints: [...] }
+      let loaded: SearchConstraint[] = []
+      try {
+        const optionsObj = typeof (opts as any).options === 'string'
+          ? JSON.parse((opts as any).options)
+          : ((opts as any).options ?? {})
+        loaded = optionsObj.constraints ?? []
+      } catch { /* ignore parse errors */ }
+      setConstraints(loaded.map(c => ({ ...c, id: c.id || uid() })))
+    } catch {
+      setAlert('Failed to load search options.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handleDeleteOptions() {
+    if (!selectedOptionsIdRef.current) return
+    setConfirm({
+      message: `Delete "${optionsName}"?`,
+      onOk: async () => {
+        setLoading(true)
+        try {
+          await deleteSearchOptions(selectedOptionsIdRef.current)
+          setOptionsId('')
+          setOptionsName('default')
+          setConstraints([])
+          refreshOptionsList(selectedDb, selectedAnalysis)
+        } catch {
+          setAlert('Failed to delete search options.')
+        } finally {
+          setLoading(false)
+        }
+      },
+    })
+  }
+
+  // ── Sync indexes ─────────────────────────────────────────────────────
+  async function handleExportOptions() {
+    if (!selectedOptionsId) { setAlert('Save the options before exporting.'); return }
+    const safeName = optionsName.replace(/[^a-zA-Z0-9_-]/g, '-') || 'search-options'
+    try {
+      const xml = await exportSearchOptionsXml(selectedOptionsId, safeName)
+      const blob = new Blob([xml], { type: 'application/xml' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${safeName}.xml`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setAlert('Failed to export search options.')
+    }
+  }
+
+  async function handleSyncIndexes() {
+    const faceted = constraints.filter(c => c.facet)
+    if (faceted.length === 0) { setAlert('No constraints have "Return facet counts" enabled.'); return }
+    setLoading(true)
+    try {
+      const result = await syncIndexes(selectedDb, JSON.stringify(faceted))
+      setAlert(result.message ?? 'Indexes synced.')
+    } catch {
+      setAlert('Failed to sync indexes.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // ── Execute search ────────────────────────────────────────────────────
   const handleSearch = useCallback(async (p = 1) => {
-    if (constraints.length === 0) {
-      setAlert('Add at least one constraint before searching.')
-      return
-    }
+    const optId = selectedOptionsIdRef.current
     setExecuting(true)
     setExecError('')
     setResults([])
     setFacets([])
     setPage(p)
-    if (p === 1) setExpandedRows(new Set())
     try {
-      // Auto-save/update the options silently so the backend always has a current copy
-      let optId = selectedOptionsIdRef.current
-      const optionsJson = buildOptionsJson(constraints)
-      if (optId) {
-        await updateSearchOptions(optId, 'default', optionsJson)
-      } else {
-        const saved = await saveSearchOptions(selectedDb, selectedAnalysis, 'default', optionsJson)
-        optId = saved.id
-        setOptionsId(optId)
-      }
       const res = await executeSearch(selectedDb, optId, queryStr, p, pageSize)
       if (res.valid) {
         const est = parseInt(res.estimate, 10) || 0
@@ -289,7 +508,7 @@ export default function SearchPage() {
         setFacets(res.facets ?? [])
         setTotalPages(Math.max(1, Math.ceil(est / pageSize)))
         if (p === 1 && res.results.length <= 5)
-          setExpandedRows(new Set(res.results.map((_, i) => i)))
+          setExpandedRows(new Set(res.results.map(r => r.uri)))
       } else {
         setExecError(res.error ?? 'Search failed')
         setEstimate(null)
@@ -339,7 +558,81 @@ export default function SearchPage() {
           </select>
         )}
 
+        <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 flex-shrink-0" />
+
+        {/* Load saved options */}
+        <select
+          value={selectedOptionsId}
+          onChange={e => handleLoadOptions(e.target.value)}
+          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded px-2 py-1.5 text-sm focus:outline-none focus:border-blue-500"
+        >
+          <option value="">— new options —</option>
+          {savedOptionsList.map(o => (
+            <option key={o.id} value={o.id}>{o.name}</option>
+          ))}
+        </select>
+
+        {/* Name input */}
+        <input
+          type="text"
+          value={optionsName}
+          onChange={e => setOptionsName(e.target.value)}
+          placeholder="Options name"
+          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded px-2 py-1.5 text-sm focus:outline-none focus:border-blue-500 w-36"
+        />
+
+        {/* Save button */}
+        <button
+          onClick={handleSaveOptions}
+          disabled={constraints.length === 0}
+          className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded border border-blue-400 dark:border-blue-400/50 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-400/10 hover:bg-blue-100 dark:hover:bg-blue-400/20 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {selectedOptionsId ? 'Update' : 'Save'}
+        </button>
+
+        {/* Delete button */}
+        {selectedOptionsId && (
+          <button
+            onClick={handleDeleteOptions}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded border border-red-300 dark:border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-400/10"
+          >
+            <Trash2 size={13} /> Delete
+          </button>
+        )}
+
+        {/* Export options */}
+        {constraints.length > 0 && (
+          <button
+            onClick={handleExportOptions}
+            title="Download search options as JSON"
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            <Download size={13} /> Export
+          </button>
+        )}
+
+        {/* Sync indexes button — visible when any constraint has facet=true */}
+        {constraints.some(c => c.facet) && (
+          <button
+            onClick={handleSyncIndexes}
+            title="Create range indexes in MarkLogic for faceted constraints"
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded border border-amber-400 dark:border-amber-400/50 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-400/10 hover:bg-amber-100 dark:hover:bg-amber-400/20"
+          >
+            Sync Indexes
+          </button>
+        )}
+
         <div className="flex-1" />
+
+        {/* JSON preview toggle */}
+        <button
+          onClick={() => setShowJsonPreview(v => !v)}
+          title="Toggle search options JSON preview"
+          className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded border transition-colors ${showJsonPreview ? 'border-blue-400 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-400/10' : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-blue-400'}`}
+        >
+          <Braces size={13} />
+          Options JSON
+        </button>
       </div>
 
       {/* Body: 3-column layout */}
@@ -445,16 +738,30 @@ export default function SearchPage() {
                       <option value="collection">collection</option>
                     </select>
                   </div>
-                  {/* Facet toggle */}
-                  <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={c.facet}
-                      onChange={e => updateConstraint(c.id, { facet: e.target.checked })}
-                      className="rounded"
-                    />
-                    Return facet counts
-                  </label>
+                  {/* Range-only options */}
+                  {c.type === 'range' && (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={c.facet}
+                          onChange={e => updateConstraint(c.id, { facet: e.target.checked })}
+                          className="rounded"
+                        />
+                        Return facet counts
+                      </label>
+                      <select
+                        value={c.facetOrder ?? 'frequency-descending'}
+                        onChange={e => updateConstraint(c.id, { facetOrder: e.target.value as SearchConstraint['facetOrder'] })}
+                        className="text-xs rounded px-1.5 py-0.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                      >
+                        <option value="frequency-descending">count descending</option>
+                        <option value="frequency-ascending">count ascending</option>
+                        <option value="value-ascending">value ascending</option>
+                        <option value="value-descending">value descending</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
               ))
             )}
@@ -482,6 +789,15 @@ export default function SearchPage() {
               <Play size={13} />
               {executing ? 'Searching…' : 'Search'}
             </button>
+            {queryStr && (
+              <button
+                onClick={() => { setQueryStr(''); handleSearch(1) }}
+                className="text-sm px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                title="Clear query and re-run"
+              >
+                Clear
+              </button>
+            )}
             {estimate !== null && !execError && (
               <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
                 {estimate.toLocaleString()} result{estimate !== 1 ? 's' : ''}
@@ -507,20 +823,32 @@ export default function SearchPage() {
                   <span className="text-xs text-gray-500 dark:text-gray-400">
                     {estimate?.toLocaleString()} results{totalPages > 1 ? ` · page ${page} of ${totalPages}` : ''}
                   </span>
-                  {totalPages > 1 && (
-                    <div className="flex gap-1">
-                      <button
-                        disabled={page <= 1 || executing}
-                        onClick={() => handleSearch(page - 1)}
-                        className="flex items-center justify-center w-6 h-6 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-40 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-                      ><ChevronLeft size={13} /></button>
-                      <button
-                        disabled={page >= totalPages || executing}
-                        onClick={() => handleSearch(page + 1)}
-                        className="flex items-center justify-center w-6 h-6 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-40 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-                      ><ChevronRightIcon size={13} /></button>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {/* Expand / collapse all */}
+                    <button
+                      onClick={() => {
+                        const allExpanded = results.every(r => expandedRows.has(r.uri))
+                        setExpandedRows(allExpanded ? new Set() : new Set(results.map(r => r.uri)))
+                      }}
+                      className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                    >
+                      {results.every(r => expandedRows.has(r.uri)) ? 'Collapse all' : 'Expand all'}
+                    </button>
+                    {totalPages > 1 && (
+                      <div className="flex gap-1">
+                        <button
+                          disabled={page <= 1 || executing}
+                          onClick={() => handleSearch(page - 1)}
+                          className="flex items-center justify-center w-6 h-6 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-40 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        ><ChevronLeft size={13} /></button>
+                        <button
+                          disabled={page >= totalPages || executing}
+                          onClick={() => handleSearch(page + 1)}
+                          className="flex items-center justify-center w-6 h-6 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-40 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        ><ChevronRightIcon size={13} /></button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -530,14 +858,14 @@ export default function SearchPage() {
                     key={`${page}-${i}`}
                     result={r}
                     index={i}
-                    expanded={expandedRows.has(i)}
-                    onToggle={() => setExpandedRows(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n })}
+                    expanded={expandedRows.has(r.uri)}
+                    onToggle={() => setExpandedRows(prev => { const n = new Set(prev); n.has(r.uri) ? n.delete(r.uri) : n.add(r.uri); return n })}
                     cmTheme={cmTheme}
                   />
                 )) : (
                   !executing && !execError && (
                     <div className="flex items-center justify-center h-full text-xs text-gray-400 dark:text-gray-500">
-                      {estimate === 0 ? 'No results matched.' : 'Build constraints, save, then search.'}
+                      {estimate === 0 ? 'No results matched.' : 'Select a database to search.'}
                     </div>
                   )
                 )}

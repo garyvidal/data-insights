@@ -63,6 +63,28 @@ public class SearchController {
         return ResponseEntity.ok().build();
     }
 
+    // ── Sync indexes ──────────────────────────────────────────────────────────
+
+    @PostMapping("/indexes/sync")
+    public ResponseEntity<Map<String, Object>> syncIndexes(@RequestBody Map<String, Object> body) {
+        String db          = (String) body.get("db");
+        String constraints = (String) body.get("constraints");
+        boolean drop       = Boolean.TRUE.equals(body.get("dropMissing"));
+        return ResponseEntity.ok(mlService.syncIndexes(db, constraints, drop));
+    }
+
+    // ── Export search options as XML ──────────────────────────────────────────
+
+    @GetMapping(value = "/search-options/{id}/export", produces = "application/xml")
+    public ResponseEntity<String> exportSearchOptions(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "search-options") String name) {
+        String xml = mlService.exportSearchOptionsXml(id);
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"" + name + ".xml\"")
+                .body(xml);
+    }
+
     // ── Execute search ────────────────────────────────────────────────────────
 
     @PostMapping("/search")

@@ -195,6 +195,10 @@ public class AnalysisController {
     @GetMapping(value = "/notifications/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamNotifications(@RequestParam String db) {
         SseEmitter emitter = new SseEmitter(300_000L);
+        java.util.concurrent.atomic.AtomicBoolean done = new java.util.concurrent.atomic.AtomicBoolean(false);
+        emitter.onCompletion(() -> done.set(true));
+        emitter.onTimeout(() -> done.set(true));
+        emitter.onError(t -> done.set(true));
 
         // Capture the request context from the servlet thread before the virtual thread starts.
         // Virtual threads do not inherit Spring's ThreadLocal-bound RequestAttributes.
@@ -205,9 +209,11 @@ public class AnalysisController {
             org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(requestAttributes);
             long start = System.currentTimeMillis();
             try {
-                while (System.currentTimeMillis() - start < 300_000L) {
+                while (!done.get() && System.currentTimeMillis() - start < 300_000L) {
                     List<Map<String, Object>> analyses = mlService.getAnalysisList(db);
                     Map<String, Object> notifResult = mlService.getNotificationResult();
+
+                    if (done.get()) return;
 
                     Map<String, Object> payload = new LinkedHashMap<>();
                     payload.put("analyses", analyses);
@@ -224,9 +230,9 @@ public class AnalysisController {
 
                     Thread.sleep(2000);
                 }
-                emitter.complete();
+                if (!done.get()) emitter.complete();
             } catch (Exception e) {
-                emitter.completeWithError(e);
+                if (!done.get()) emitter.completeWithError(e);
             } finally {
                 org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
             }

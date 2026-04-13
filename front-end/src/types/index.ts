@@ -173,6 +173,7 @@ export interface SearchConstraint {
   nodeKind: string      // "object" | "array" | "" for XML
   inferedTypes: string
   facet: boolean
+  facetOrder?: 'frequency-descending' | 'frequency-ascending' | 'value-ascending' | 'value-descending'
 }
 
 export interface SearchOptionsSet {

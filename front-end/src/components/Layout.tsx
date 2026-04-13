@@ -62,7 +62,7 @@ const navItems = [
   { to: '/analyze', label: 'Analyze', Icon: AnalyzeIcon },
   { to: '/schema', label: 'Schema', Icon: SchemaIcon },
   { to: '/upload', label: 'Upload', Icon: UploadIcon },
-  // { to: '/search', label: 'Search', Icon: SearchIcon },
+  { to: '/search', label: 'Search', Icon: SearchIcon },
 ]
 
 export default function Layout() {

@@ -71,12 +71,12 @@ declare function post(
     $params  as map:map,
     $input   as document-node()*
 ) as document-node()? {
-    let $action      := xdmp:get-request-field("action")
-    let $db          := xdmp:get-request-field("db")
-    let $analysis-id := xdmp:get-request-field("analysis-id")
-    let $name        := xdmp:get-request-field("name")
-    let $options-str := xdmp:get-request-field("options")
-    let $id          := xdmp:get-request-field("id")
+    let $action      := map:get($params, "action")
+    let $db          := map:get($params, "db")
+    let $analysis-id := map:get($params, "analysis-id")
+    let $name        := map:get($params, "optname")
+    let $options-str := map:get($params, "options")
+    let $id          := map:get($params, "id")
     return
         if ($action = "save") then
             let $new-id  := fn:string(xdmp:random())
@@ -133,13 +133,16 @@ declare function post(
                     cts:json-property-value-query("id", $id)
                 )))[1]
             return
-                if ($doc) then (
-                    xdmp:invoke-function(
-                        function() { xdmp:node-delete($doc) },
-                        <options xmlns="xdmp:eval"><transaction-mode>update-auto-commit</transaction-mode></options>
-                    ),
-                    document { object-node { "status": "deleted" } }
-                ) else
+                if ($doc) then
+                    let $uri := xdmp:node-uri($doc)
+                    return (
+                        xdmp:invoke-function(
+                            function() { xdmp:document-delete($uri) },
+                            <options xmlns="xdmp:eval"><transaction-mode>update-auto-commit</transaction-mode></options>
+                        ),
+                        document { object-node { "status": "deleted" } }
+                    )
+                else
                     document { object-node { "status": "error" } }
         else
             document { object-node { "error": "unknown action" } }

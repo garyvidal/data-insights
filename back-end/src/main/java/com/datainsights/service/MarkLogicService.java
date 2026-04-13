@@ -358,10 +358,10 @@ public class MarkLogicService {
 
     public Map<String, Object> saveSearchOptions(String db, String analysisId, String name, String optionsJson) {
         String response = post("/v1/resources/search-options",
-                formOf("action", "save", "db", db,
-                        "analysis-id", analysisId != null ? analysisId : "",
-                        "name", name,
-                        "options", optionsJson));
+                formOf("rs:action", "save", "rs:db", db,
+                        "rs:analysis-id", analysisId != null ? analysisId : "",
+                        "rs:optname", name,
+                        "rs:options", optionsJson));
         // response is JSON {"id":"..."}
         Map<String, Object> result = new LinkedHashMap<>();
         String id = extractJsonString(response, "id");
@@ -371,15 +371,15 @@ public class MarkLogicService {
 
     public Map<String, Object> updateSearchOptions(String id, String name, String optionsJson) {
         String response = post("/v1/resources/search-options",
-                formOf("action", "update", "id", id,
-                        "name", name, "options", optionsJson));
+                formOf("rs:action", "update", "rs:id", id,
+                        "rs:optname", name, "rs:options", optionsJson));
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", extractJsonString(response, "id"));
         return result;
     }
 
     public void deleteSearchOptions(String id) {
-        post("/v1/resources/search-options", formOf("action", "delete", "id", id));
+        post("/v1/resources/search-options", formOf("rs:action", "delete", "rs:id", id));
     }
 
     public Map<String, Object> getSearchOptions(String id) {
@@ -387,14 +387,31 @@ public class MarkLogicService {
         return parseJsonObject(json);
     }
 
+    // ── Index Management ─────────────────────────────────────────────────────
+
+    public Map<String, Object> syncIndexes(String db, String constraintsJson, boolean dropMissing) {
+        String response = post("/v1/resources/manage-indexes",
+                formOf("rs:action", "sync",
+                        "rs:db", db,
+                        "rs:constraints", constraintsJson,
+                        "rs:drop-missing", dropMissing ? "true" : "false"));
+        return parseJsonObject(response);
+    }
+
+    // ── Search Options XML Export ─────────────────────────────────────────────
+
+    public String exportSearchOptionsXml(String optionsId) {
+        return get("/v1/resources/search", Map.of("rs:options-id", optionsId));
+    }
+
     // ── Search Execute ────────────────────────────────────────────────────────
 
     public Map<String, Object> executeSearch(String db, String optionsId, String query, int page, int pageSize) {
         String xml = post("/v1/resources/search",
-                formOf("db", db, "options-id", optionsId,
-                        "query", query != null ? query : "",
-                        "page", String.valueOf(page),
-                        "pageSize", String.valueOf(pageSize)));
+                formOf("rs:db", db, "rs:options-id", optionsId,
+                        "rs:query", query != null ? query : "",
+                        "rs:page", String.valueOf(page),
+                        "rs:pageSize", String.valueOf(pageSize)));
         Document doc = parse(xml);
         Element root = doc.getDocumentElement();
 
