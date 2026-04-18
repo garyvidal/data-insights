@@ -11,6 +11,7 @@ import AnalyzePage from './pages/AnalyzePage'
 import { SchemaManagementPage } from './pages/SchemaManagementPage'
 import UploadPage from './pages/UploadPage'
 import SearchPage from './pages/SearchPage'
+import GraphQLExplorerPage from './pages/GraphQLExplorerPage'
 import AlertDialog from './components/AlertDialog'
 
 function PrivateRoute({ children }: { children: ReactNode }) {
@@ -64,6 +65,7 @@ export default function App() {
               <Route path="schema" element={<SchemaManagementPage />} />
               <Route path="upload" element={<UploadPage />} />
               <Route path="search" element={<SearchPage />} />
+              <Route path="graphql" element={<GraphQLExplorerPage />} />
             </Route>
           </Routes>
         </AuthProvider>

@@ -21,6 +21,8 @@ import type {
   UploadPermission,
   SearchOptionsSet,
   SearchResultSet,
+  GraphQLRequest,
+  GraphQLResponse,
 } from '../types'
 
 const api = axios.create({ baseURL: '/api', withCredentials: true })
@@ -267,6 +269,27 @@ export const executeSearch = (
   pageSize: number,
 ): Promise<SearchResultSet> =>
   api.post('/search', { db, optionsId, query, page, pageSize }).then(r => r.data)
+
+// ── GraphQL ───────────────────────────────────────────────────────────────
+
+export const executeGraphQL = (request: GraphQLRequest): Promise<GraphQLResponse> =>
+  api.post<GraphQLResponse>('/v1/resources/graphql', request).then(r => r.data)
+
+export const deriveGraphQLSchema = (
+  typeName: string,
+  collection: string,
+  analysisUri: string,
+  format: 'json' | 'xml' = 'json',
+  db?: string,
+): Promise<Record<string, unknown>> =>
+  api
+    .post('/v1/resources/graphql', { action: 'derive', type: typeName, collection, analysisUri, format, db })
+    .then(r => r.data)
+
+export const getGraphQLSchema = (typeName?: string): Promise<Record<string, unknown>> =>
+  api
+    .get('/v1/resources/graphql', { params: { action: 'schema', ...(typeName ? { type: typeName } : {}) } })
+    .then(r => r.data)
 
 // ── Upload ────────────────────────────────────────────────────────────────
 

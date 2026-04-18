@@ -47,7 +47,6 @@ function prettyPrintContent(content: string, lang: 'json' | 'xml' | 'unknown'): 
 
 function indentXml(node: Element, depth: number): string {
   const pad = '  '.repeat(depth)
-  const childPad = '  '.repeat(depth + 1)
   const children = Array.from(node.childNodes)
   const hasElementChildren = children.some(c => c.nodeType === Node.ELEMENT_NODE)
 

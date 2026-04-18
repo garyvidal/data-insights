@@ -26,6 +26,7 @@ export interface Analysis {
   database: string
   localname: string
   documentType: 'json' | 'xml' | string
+  analysisUri?: string
 }
 
 export interface AnalysisNode {
@@ -231,4 +232,51 @@ export interface UploadResult {
 export interface UploadPermission {
   role: string
   capability: 'read' | 'update' | 'insert' | 'execute'
+}
+
+// ── GraphQL Explorer ──────────────────────────────────────────────────────────
+
+export interface GraphQLRequest {
+  query: string
+  variables?: Record<string, unknown>
+  operationName?: string
+  db?: string
+}
+
+export interface GraphQLError {
+  message: string
+  locations?: { line: number; column: number }[]
+  path?: (string | number)[]
+}
+
+export interface GraphQLResponse {
+  data: Record<string, unknown> | null
+  errors?: GraphQLError[]
+}
+
+export interface GraphQLIntrospectionType {
+  name: string
+  kind: string
+  description?: string | null
+  fields?: GraphQLIntrospectionField[] | null
+}
+
+export interface GraphQLIntrospectionField {
+  name: string
+  description?: string | null
+  type: GraphQLIntrospectionTypeRef
+}
+
+export interface GraphQLIntrospectionTypeRef {
+  kind: string
+  name?: string | null
+  ofType?: GraphQLIntrospectionTypeRef | null
+}
+
+export interface SavedGraphQLQuery {
+  id: string
+  name: string
+  query: string
+  variables: string
+  createdAt: string
 }

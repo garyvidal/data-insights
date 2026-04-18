@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -23,6 +22,9 @@ import org.xml.sax.InputSource;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.StringReader;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 @Service
@@ -109,6 +111,7 @@ public class MarkLogicService {
             Element el = (Element) analyses.item(i);
             Map<String, Object> a = new LinkedHashMap<>();
             a.put("analysisId", child(el, "analysis-id"));
+            a.put("analysisUri", child(el, "analysis-uri"));
             a.put("analysisName", child(el, "analysis-name"));
             a.put("database", child(el, "database"));
             a.put("localname", child(el, "localname"));
@@ -507,6 +510,18 @@ public class MarkLogicService {
         }
     }
 
+    // ── GraphQL ───────────────────────────────────────────────────────────────
+
+    public String graphQLGet(Map<String, String> params) {
+        Map<String, String> mlParams = new LinkedHashMap<>();
+        params.forEach((k, v) -> mlParams.put("rs:" + k, v));
+        return get("/v1/resources/graphql", mlParams);
+    }
+
+    public String graphQLPost(Object body) {
+        return postJson("/v1/resources/graphql", body);
+    }
+
     // ── Notifications ─────────────────────────────────────────────────────────
 
     public Map<String, Object> getNotificationResult() {
@@ -531,21 +546,33 @@ public class MarkLogicService {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private String get(String path, Map<String, String> params) {
-        UriComponentsBuilder builder = UriComponentsBuilder
-                .fromHttpUrl(config.getBaseUrl() + path);
-        params.forEach(builder::queryParam);
-        String url = builder.toUriString();
-        log.debug("GET {}", url);
-        return restTemplate().getForObject(url, String.class);
+        URI uri = buildUri(path, params);
+        log.debug("GET {}", uri);
+        return restTemplate().getForObject(uri, String.class);
     }
 
     private void delete(String path, Map<String, String> params) {
-        UriComponentsBuilder builder = UriComponentsBuilder
-                .fromHttpUrl(config.getBaseUrl() + path);
-        params.forEach(builder::queryParam);
-        String url = builder.toUriString();
-        log.debug("DELETE {}", url);
-        restTemplate().delete(url);
+        URI uri = buildUri(path, params);
+        log.debug("DELETE {}", uri);
+        restTemplate().delete(uri);
+    }
+
+    /**
+     * Builds a URI where param names are kept verbatim (preserving colons such as
+     * "rs:action" required by MarkLogic REST extensions) and only values are
+     * percent-encoded.
+     */
+    private URI buildUri(String path, Map<String, String> params) {
+        StringBuilder sb = new StringBuilder(config.getBaseUrl() + path);
+        if (!params.isEmpty()) {
+            sb.append('?');
+            StringJoiner joiner = new StringJoiner("&");
+            for (Map.Entry<String, String> e : params.entrySet()) {
+                joiner.add(e.getKey() + "=" + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8));
+            }
+            sb.append(joiner);
+        }
+        return URI.create(sb.toString());
     }
 
     private String post(String path, MultiValueMap<String, String> form) {

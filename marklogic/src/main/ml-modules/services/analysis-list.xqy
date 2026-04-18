@@ -29,6 +29,7 @@ declare function get(
                     <analysis>
                         {
                             $analysis/analysis-id,
+                            <analysis-uri>{xdmp:node-uri($analysis)}</analysis-uri>,
                             <analysis-name>{fn:data($analysis/name)}</analysis-name>,
                             $analysis/database,
                             $analysis/ca:root-element
