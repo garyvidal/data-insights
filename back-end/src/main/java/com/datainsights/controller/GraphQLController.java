@@ -60,6 +60,25 @@ public class GraphQLController {
         return ResponseEntity.ok(json);
     }
 
+    /**
+     * DELETE — remove a schema type by name.
+     * Proxies DELETE /v1/resources/graphql?rs:type={type} to MarkLogic.
+     */
+    @DeleteMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<JsonNode> graphQLDelete(@RequestParam Map<String, String> params) {
+        try {
+            mlService.graphQLDelete(params);
+            String typeName = params.getOrDefault("type", "");
+            return ResponseEntity.ok(objectMapper.createObjectNode()
+                    .put("deleted", true)
+                    .put("type", typeName));
+        } catch (Exception e) {
+            log.error("MarkLogic DELETE error. params={}", params, e);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(
+                    objectMapper.createObjectNode().put("error", e.getMessage()));
+        }
+    }
+
     /** Parse as JSON; if MarkLogic returned XML or something unexpected, wrap it as an error node. */
     private JsonNode parseOrWrap(String response) {
         try {

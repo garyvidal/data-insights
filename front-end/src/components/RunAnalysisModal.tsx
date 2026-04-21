@@ -3,6 +3,7 @@ import { getRootElements, runAnalysis } from '../services/api'
 import type { RootElement } from '../types'
 import { useTheme } from '../context/ThemeContext'
 import CodeMirror from '@uiw/react-codemirror'
+import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night'
 import { StreamLanguage } from '@codemirror/language'
 import { xQuery } from '@codemirror/legacy-modes/mode/xquery'
 
@@ -98,7 +99,7 @@ export default function RunAnalysisModal({ db, onClose, onStarted }: Props) {
                 basicSetup={{ lineNumbers: true, foldGutter: false, highlightActiveLine: false }}
                 minHeight="80px"
                 maxHeight="160px"
-                theme={theme === 'dark' ? 'dark' : 'light'}
+                theme={theme === 'dark' ? tokyoNight : 'light'}
               />
             </div>
           </div>

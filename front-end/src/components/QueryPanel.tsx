@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Play, ShieldCheck, Bookmark, BookmarkPlus, X, Trash2, ChevronLeft, ChevronRight, Braces, ChevronsUpDown, ChevronsDownUp } from 'lucide-react'
 import CodeMirror from '@uiw/react-codemirror'
+import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night'
+import type { Extension } from '@codemirror/state'
 import { StreamLanguage } from '@codemirror/language'
 import { xQuery } from '@codemirror/legacy-modes/mode/xquery'
 import { xml } from '@codemirror/lang-xml'
@@ -92,7 +94,7 @@ function ResultCard({
   index: number
   expanded: boolean
   onToggle: () => void
-  cmTheme: 'dark' | 'light'
+  cmTheme: 'light' | 'dark' | Extension
   prettyPrint: boolean
 }) {
   const lang = detectLanguage(result.content)
@@ -154,7 +156,7 @@ function ResultCard({
 export default function QueryPanel({ db, analysisId, selectedXPath }: QueryPanelProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
-  const cmTheme = isDark ? 'dark' : 'light'
+  const cmTheme = isDark ? tokyoNight : 'light'
 
   // ── Panel state ───────────────────────────────────────────────────────────
   const [collapsed, setCollapsed] = useState(false)

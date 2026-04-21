@@ -1,6 +1,6 @@
 # Data Insights
 
-A full-stack document analysis platform for exploring and profiling JSON and XML documents stored in MarkLogic. It provides structural analysis, element frequency statistics, schema generation and validation, interactive query execution, and document upload — all through a modern React UI with full dark mode support.
+A full-stack document analysis platform for exploring and profiling JSON and XML documents stored in MarkLogic. It provides structural analysis, element frequency statistics, schema generation and validation, interactive query execution, GraphQL querying with Relay-style pagination, and document upload — all through a modern React UI with full dark mode support.
 
 ## Architecture
 
@@ -20,6 +20,10 @@ The backend acts as a broker, translating REST API calls from the frontend into 
 - **Root Element Distribution** — Visualize distinct root elements across the database
 - **Document Analysis** — Deep structural profiling of element/attribute hierarchies, inferred data types, value distributions, XPath expressions, document size stats, and namespace mappings
 - **Interactive Query Panel** — Write and execute XQuery/XPath expressions directly against the database with validate, execute, pagination, pretty-print, and saved expressions
+- **GraphQL Explorer** — Interactive GraphQL IDE with syntax highlighting, schema-aware autocomplete (cm6-graphql), query explain, and example query generation; backed by a MarkLogic-native GraphQL engine that translates queries into `cts.search()` calls
+- **GraphQL Relay Pagination** — Full Relay-style connection pagination (`first`/`after`/`before`, opaque base64 cursors, `pageInfo`, `totalCount`) on root and relation fields
+- **GraphQL Schema Management** — Derive schemas from document analyses, view/edit relation definitions inline, delete individual types, and invalidate server-side registry cache on mutation
+- **GraphQL Query Explain** — Inspect the CTS query plan generated for any GraphQL query without executing it
 - **Schema Generation** — Generate TDE or JSON schemas from analysis results
 - **Schema Validation** — Validate documents against a generated schema and view coverage metrics
 - **Schema Viewer** — Inspect the full content of any generated schema inline
@@ -38,6 +42,8 @@ The backend acts as a broker, translating REST API calls from the frontend into 
 | Styling      | Tailwind CSS                | 3.4.14           |
 | Icons        | Lucide React                | latest           |
 | Code Editor  | CodeMirror 6                | latest           |
+| GraphQL IDE  | cm6-graphql                 | latest           |
+| GraphQL      | graphql-js                  | 16.x             |
 | Charts       | Recharts                    | 2.13.0           |
 | Data Grids   | TanStack Table              | 8.20.5           |
 | HTTP Client  | Axios                       | 1.7.7            |
@@ -53,7 +59,8 @@ data-insights/
 ├── front-end/                          # React/TypeScript UI
 │   └── src/
 │       ├── pages/                      # HomePage, DistributionPage, AnalyzePage,
-│       │                               # CoveragePage, SchemaManagementPage, UploadPage
+│       │                               # CoveragePage, SchemaManagementPage, UploadPage,
+│       │                               # GraphQLExplorerPage, SearchPage
 │       ├── components/                 # QueryPanel, SchemaGeneratorModal,
 │       │                               # SchemaValidatorModal, SchemaViewerModal,
 │       │                               # RunAnalysisModal, AlertDialog, ConfirmDialog, ...
@@ -63,13 +70,15 @@ data-insights/
 ├── back-end/                           # Spring Boot REST API + SPA host
 │   └── src/main/java/com/datainsights/
 │       ├── controller/                 # AnalysisController, SchemaController,
-│       │                               # UploadController, DatabaseController
+│       │                               # UploadController, DatabaseController, GraphQLController
 │       ├── service/                    # MarkLogicService, SchemaService, UploadService
 │       ├── config/                     # MarkLogicConfig, WebConfig
 │       └── dto/                        # Data transfer objects
 └── marklogic/                          # MarkLogic XQuery modules
     └── src/main/ml-modules/
         ├── root/lib/                   # Reusable XQuery libraries + async task framework
+        │   └── graphql/                # GraphQL engine: schema.sjs, planner.sjs,
+        │                               # executor.sjs, normalizer.sjs
         └── services/                   # REST resource extensions (endpoints + descriptors)
 ```
 
@@ -139,3 +148,6 @@ Open [http://localhost:5175](http://localhost:5175) in your browser.
 | `POST` | `/api/schemas/validate` | Validate documents against a schema |
 | `GET` | `/api/coverage` | Schema coverage metrics |
 | `POST` | `/api/upload` | Upload files into MarkLogic |
+| `POST` | `/v1/resources/graphql` | Execute a GraphQL query (or `action=explain` for query plan, `action=derive` to derive schema, `action=saveRelations` to persist relation definitions) |
+| `GET` | `/v1/resources/graphql?action=schema` | List all derived GraphQL types (or `&type=X` for a single type) |
+| `DELETE` | `/v1/resources/graphql?type=X` | Delete a derived GraphQL type and invalidate the registry cache |

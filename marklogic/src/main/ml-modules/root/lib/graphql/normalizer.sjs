@@ -85,16 +85,14 @@ function documentToObject(doc) {
 function _xmlElementToObject(element) {
   const obj = {};
 
-  // @*|node() selects attributes and all child nodes in a single pass,
-  // crossing namespace boundaries (e.g. <c:customers> inside <orders>).
+  // Collect attributes separately, then child elements via * (namespace-agnostic).
+  // Using node() can miss elements in non-default namespaces without explicit bindings.
   const childArray = [];
-  for (const node of element.xpath('@*|node()')) {
-    const kind = xdmp.nodeKind(node);
-    if (kind === 'attribute') {
-      obj[fn.localName(node)] = _coerceScalar(fn.string(node));
-    } else if (kind === 'element') {
-      childArray.push(node);
-    }
+  for (const attr of element.xpath('@*')) {
+    obj[fn.localName(attr)] = _coerceScalar(fn.string(attr));
+  }
+  for (const child of element.xpath('*')) {
+    childArray.push(child);
   }
 
   if (childArray.length === 0) {

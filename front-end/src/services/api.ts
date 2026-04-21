@@ -291,6 +291,22 @@ export const getGraphQLSchema = (typeName?: string): Promise<Record<string, unkn
     .get('/v1/resources/graphql', { params: { action: 'schema', ...(typeName ? { type: typeName } : {}) } })
     .then(r => r.data)
 
+export const explainGraphQL = (request: GraphQLRequest): Promise<Record<string, unknown>> =>
+  api.post<Record<string, unknown>>('/v1/resources/graphql', { ...request, action: 'explain' }).then(r => r.data)
+
+export const deleteGraphQLType = (typeName: string): Promise<{ deleted: boolean; type: string }> =>
+  api
+    .delete('/v1/resources/graphql', { params: { type: typeName } })
+    .then(r => r.data)
+
+export const saveGraphQLRelations = (
+  typeName: string,
+  relations: Record<string, { type: string; via: string; foreignKey: string }>,
+): Promise<{ saved: boolean; type: string; uri: string }> =>
+  api
+    .post('/v1/resources/graphql', { action: 'saveRelations', type: typeName, relations })
+    .then(r => r.data)
+
 // ── Upload ────────────────────────────────────────────────────────────────
 
 export const uploadFiles = (

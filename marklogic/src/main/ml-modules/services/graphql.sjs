@@ -7,3 +7,4 @@
 var resource = require('/ext/graphql.sjs');
 exports.GET  = resource.GET;
 exports.POST = resource.POST;
+exports.DELETE = resource.DELETE;

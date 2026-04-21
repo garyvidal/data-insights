@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus, Trash2, Play, ChevronDown, ChevronRight, Braces, ChevronLeft, ChevronRight as ChevronRightIcon, Download } from 'lucide-react'
 import CodeMirror from '@uiw/react-codemirror'
+import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night'
+import type { Extension } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
+import { xml } from '@codemirror/lang-xml'
 import { useDatabase } from '../context/useDatabase'
 import { useTheme } from '../context/ThemeContext'
 import {
@@ -47,11 +50,12 @@ function inferConstraintType(node: AnalysisNode): SearchConstraintType {
 }
 
 function constraintTypeColor(type: SearchConstraintType): string {
+  const dark = 'dark:bg-gray-800 dark:text-white dark:border-gray-600'
   switch (type) {
-    case 'range':      return 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
-    case 'word':       return 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
-    case 'value':      return 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
-    case 'collection': return 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300'
+    case 'range':      return `bg-blue-100 text-blue-700 border-blue-300 ${dark}`
+    case 'word':       return `bg-emerald-100 text-emerald-700 border-emerald-300 ${dark}`
+    case 'value':      return `bg-amber-100 text-amber-700 border-amber-300 ${dark}`
+    case 'collection': return `bg-teal-100 text-teal-700 border-teal-300 ${dark}`
   }
 }
 
@@ -67,21 +71,48 @@ function prettyJson(raw: string): string {
 
 function prettyXml(raw: string): string {
   try {
-    const trimmed = raw.trim()
-    let indent = 0
-    return trimmed
-      .replace(/>\s*</g, '>\n<')
-      .split('\n')
-      .map(line => {
-        const isClosing  = /^<\//.test(line)
-        const isSelfClose = /\/>$/.test(line)
-        const isProlog   = /^<\?/.test(line)
-        if (isClosing) indent = Math.max(0, indent - 1)
-        const result = '  '.repeat(indent) + line
-        if (!isClosing && !isSelfClose && !isProlog && /^<[^/]/.test(line)) indent++
-        return result
-      })
-      .join('\n')
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(raw.trim(), 'application/xml')
+    const parseError = doc.querySelector('parsererror')
+    if (parseError) return raw
+
+    const serialize = (node: Node, depth: number): string => {
+      const pad = '  '.repeat(depth)
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = (node.textContent ?? '').trim()
+        return text ? pad + text : ''
+      }
+      if (node.nodeType === Node.PROCESSING_INSTRUCTION_NODE) {
+        const pi = node as ProcessingInstruction
+        return `${pad}<?${pi.target} ${pi.data}?>`
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) return ''
+
+      const el = node as Element
+      const tag = el.tagName
+      const attrs = Array.from(el.attributes)
+        .map(a => ` ${a.name}="${a.value}"`)
+        .join('')
+
+      const children = Array.from(el.childNodes)
+      const childLines = children.map(c => serialize(c, depth + 1)).filter(Boolean)
+
+      if (childLines.length === 0) return `${pad}<${tag}${attrs}/>`
+
+      // single text child — keep inline
+      if (children.length === 1 && children[0].nodeType === Node.TEXT_NODE) {
+        return `${pad}<${tag}${attrs}>${children[0].textContent?.trim()}</${tag}>`
+      }
+
+      return [`${pad}<${tag}${attrs}>`, ...childLines, `${pad}</${tag}>`].join('\n')
+    }
+
+    const lines: string[] = []
+    doc.childNodes.forEach(n => {
+      const s = serialize(n, 0)
+      if (s) lines.push(s)
+    })
+    return lines.join('\n')
   } catch { return raw }
 }
 
@@ -108,11 +139,11 @@ function ResultCard({
   result, index, expanded, onToggle, cmTheme,
 }: {
   result: SearchResultItem; index: number; expanded: boolean
-  onToggle: () => void; cmTheme: 'dark' | 'light'
+  onToggle: () => void; cmTheme: 'light' | 'dark' | Extension
 }) {
   const trimmed = result.content.trimStart()
   const lang    = trimmed.startsWith('{') || trimmed.startsWith('[') ? 'json' : 'xml'
-  const ext     = lang === 'json' ? [json()] : []
+  const ext     = lang === 'json' ? [json()] : [xml()]
   const content = prettyContent(result.content)
 
   return (
@@ -199,7 +230,7 @@ function FacetPanel({ facets, onAddFilter }: { facets: SearchFacet[]; onAddFilte
 export default function SearchPage() {
   const { selectedDb } = useDatabase()
   const { theme } = useTheme()
-  const cmTheme = theme === 'dark' ? 'dark' : 'light'
+  const cmTheme = theme === 'dark' ? tokyoNight : 'light'
 
   // ── Analysis picker ───────────────────────────────────────────────────
   const [analyses, setAnalyses]             = useState<Analysis[]>([])
@@ -664,7 +695,7 @@ export default function SearchPage() {
                     <select
                       value={c.type}
                       onChange={e => updateConstraint(c.id, { type: e.target.value as SearchConstraintType })}
-                      className={`text-xs rounded px-1.5 py-0.5 border-0 font-medium ${constraintTypeColor(c.type)}`}
+                      className={`text-xs rounded px-1.5 py-0.5 border font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 ${constraintTypeColor(c.type)}`}
                     >
                       <option value="word">word</option>
                       <option value="value">value</option>

@@ -55,8 +55,11 @@
  * </analysis>
  */
 
-const SCHEMA_PREFIX = '/graphql/schema/';
-const ANALYSIS_NS   = 'http://marklogic.com/content-analyzer';
+const SCHEMA_PREFIX  = '/graphql/schema/';
+const DERIVE_PREFIX  = '/graphql/derive/';
+const ANALYSIS_NS    = 'http://marklogic.com/content-analyzer';
+const REGISTRY_CACHE_KEY      = 'graphql-registry-v2';
+const INTROSPECTION_CACHE_KEY = 'graphql-introspection-v2';
 
 // ---------------------------------------------------------------------------
 // Type mapping: MarkLogic inferred type → GraphQL scalar
@@ -83,6 +86,14 @@ const ML_TYPE_TO_GQL = {
 };
 
 // ---------------------------------------------------------------------------
+// Cache invalidation — call after any mutating action (derive, saveRelations, delete)
+// ---------------------------------------------------------------------------
+function invalidateRegistryCache() {
+  try { xdmp.setServerField(REGISTRY_CACHE_KEY, null); }      catch (e) { /* non-fatal */ }
+  try { xdmp.setServerField(INTROSPECTION_CACHE_KEY, null); } catch (e) { /* non-fatal */ }
+}
+
+// ---------------------------------------------------------------------------
 // Load a single hand-authored schema document from MarkLogic
 // ---------------------------------------------------------------------------
 function _loadStoredSchema(typeName) {
@@ -93,21 +104,18 @@ function _loadStoredSchema(typeName) {
 }
 
 // ---------------------------------------------------------------------------
-// List all stored schema documents
+// List all stored schema documents (collection-query, not URI scan)
 // ---------------------------------------------------------------------------
 function _listStoredTypes() {
   const types = {};
-  for (const uri of cts.uris(SCHEMA_PREFIX, ['document'])) {
-    const uriStr = String(uri);
-    if (!uriStr.startsWith(SCHEMA_PREFIX)) break;
+  for (const doc of cts.search(
+    cts.collectionQuery('graphql-schema'),
+    ['score-zero', 'unfaceted', 'unfiltered']
+  )) {
     try {
-      const doc = cts.doc(uri).toObject();
-      if (doc && doc.type) {
-        types[doc.type] = doc;
-      }
-    } catch (e) {
-      // skip malformed
-    }
+      const obj = doc.toObject();
+      if (obj && obj.type) types[obj.type] = obj;
+    } catch (e) { /* skip malformed */ }
   }
   return types;
 }
@@ -132,6 +140,21 @@ function deriveFromAnalysis(analysisDoc, options) {
   const format     = options.format || 'json';
 
   const ns = ANALYSIS_NS;
+
+  // ── Extract namespace declarations from the analysis <namespaces> block ──
+  // The analysis XQuery emits: <namespaces><namespace><prefix>ns0</prefix><namespace-uri>http://...</namespace-uri></namespace>...</namespaces>
+  // We build two maps: prefix→uri (for the schema namespaces field) and uri→prefix (for QName construction).
+  const namespacesMap = {};   // prefix → uri  (stored in schema, used by planner _xmlQName)
+  const uriToPrefixMap = {};  // uri → prefix  (used to resolve per-element namespaces)
+  const nsNodes = analysisDoc.xpath(`//*[fn:namespace-uri(.) = "${ns}"][fn:local-name(.) = "namespaces"]/*[fn:local-name(.) = "namespace"]`);
+  for (const nsNode of nsNodes) {
+    const prefix = fn.string(nsNode.xpath(`*[fn:local-name(.) = "prefix"]`)[Symbol.iterator]().next().value || '');
+    const uri    = fn.string(nsNode.xpath(`*[fn:local-name(.) = "namespace-uri"]`)[Symbol.iterator]().next().value || '');
+    if (uri) {
+      namespacesMap[prefix || ''] = uri;
+      uriToPrefixMap[uri] = prefix || '';
+    }
+  }
 
   // Collect all <element> nodes from the analysis
   const elementNodes = analysisDoc.xpath(`//*[fn:namespace-uri(.) = "${ns}"][fn:local-name(.) = "element"]`);
@@ -164,16 +187,18 @@ function deriveFromAnalysis(analysisDoc, options) {
   // Pass 1: collect raw metadata for every element node, keyed by localname.
   // We need all elements in hand before we can decide which belong to the root
   // type vs. which belong to a nested type.
-  const elementMeta = {};   // localname → { inferType, nodeKind, frequency, xpath }
+  const elementMeta = {};   // localname → { inferType, nodeKind, frequency, xpath, namespaceUri }
   for (const el of elementNodes) {
     const localname = _text(el, 'localname');
     if (!localname || elementMeta[localname]) continue;
     const xpathNode = el.xpath(`*[fn:local-name(.) = "xpaths"]/*[fn:local-name(.) = "xpath"]/*[fn:local-name(.) = "xpath-uri"]`)[Symbol.iterator]().next().value;
+    const namespaceUri = _text(el, 'namespace') || '';
     elementMeta[localname] = {
-      inferType: _text(el, 'infered-types'),
-      nodeKind:  _text(el, 'node-kind'),
-      frequency: parseInt(_text(el, 'frequency') || '0', 10),
-      xpath:     xpathNode ? fn.string(xpathNode) : ('/' + localname),
+      inferType:    _text(el, 'infered-types'),
+      nodeKind:     _text(el, 'node-kind'),
+      frequency:    parseInt(_text(el, 'frequency') || '0', 10),
+      xpath:        xpathNode ? fn.string(xpathNode) : ('/' + localname),
+      namespaceUri,
     };
   }
 
@@ -234,7 +259,17 @@ function deriveFromAnalysis(analysisDoc, options) {
       sourceKey = ownerIdx >= 0 ? parts.slice(ownerIdx + 1).join('.') : localname;
     }
 
-    return { type: gqlType, sourceKey, xpath: meta.xpath, index, frequency: meta.frequency };
+    const isNestedType = (isArray && children && children.size > 0) || (isObject || (children && children.size > 0));
+    const fieldDef = { type: gqlType, sourceKey, xpath: meta.xpath, index, frequency: meta.frequency };
+    if (isNestedType) {
+      fieldDef.embedded = true;
+      fieldDef.index    = null;  // nested types have no scalar index
+    }
+    // For XML, store the element's namespace URI so the planner can build the correct QName
+    if (format === 'xml' && meta.namespaceUri) {
+      fieldDef.namespace = meta.namespaceUri;
+    }
+    return fieldDef;
   }
 
   // The root element local-name (xpath depth = 1) should never appear as a field
@@ -281,6 +316,7 @@ function deriveFromAnalysis(analysisDoc, options) {
       type:       nestedTypeName,
       collection,
       format,
+      namespaces: Object.keys(namespacesMap).length > 0 ? namespacesMap : undefined,
       fields:     nestedFields,
       relations:  {},
       derived:    true,
@@ -292,6 +328,7 @@ function deriveFromAnalysis(analysisDoc, options) {
     type: typeName,
     collection,
     format,
+    namespaces: Object.keys(namespacesMap).length > 0 ? namespacesMap : undefined,
     fields,
     relations: {},
     derived: true,
@@ -311,63 +348,75 @@ function deriveFromAnalysis(analysisDoc, options) {
  * }
  */
 function loadRegistry() {
-  xdmp.log('[schema] loadRegistry() start', 'debug');
+  try {
+    const cached = xdmp.getServerField(REGISTRY_CACHE_KEY);
+    if (cached !== null && cached !== undefined) {
+      const registry = JSON.parse(
+        typeof cached === 'string' ? cached : xdmp.quote(cached)
+      );
+      if (registry && registry.types) {
+        xdmp.log('[schema] loadRegistry() — cache hit', 'fine');
+        return registry;
+      }
+    }
+  } catch (e) { /* server fields unavailable or parse error — fall through */ }
+
+  xdmp.log('[schema] loadRegistry() — building registry', 'debug');
   const stored = _listStoredTypes();
   xdmp.log('[schema] stored schema types: ' + JSON.stringify(Object.keys(stored)), 'debug');
 
-  // Also discover analysis-derived schemas from stored derivation hints
-  // Derivation hints live at /graphql/derive/{TypeName}.json with shape:
-  //   { typeName, collection, format, analysisUri, rootElement? }
+  // Build a set of collections already covered by hand-authored schemas so
+  // derive hints for the same collection are skipped entirely — even when the
+  // type names differ (e.g. stored "Order" vs derived "Orders").
+  const storedCollections = new Set();
+  for (const typeDef of Object.values(stored)) {
+    if (typeDef.collection) storedCollections.add(typeDef.collection);
+  }
+
   const derived = {};
-  const derivePrefix = '/graphql/derive/';
-  const deriveQuery = cts.andQuery([
-    cts.directoryQuery(derivePrefix,"1")
-  ]);
-  const deriveUris = [];
-  for (const uri of cts.uris(derivePrefix, ['document'],deriveQuery)) {
-    const uriStr = String(uri);
-    if (!uriStr.startsWith(derivePrefix)) break;
-    deriveUris.push(uriStr);
+  for (const doc of cts.search(
+    cts.collectionQuery('graphql-derive'),
+    ['score-zero', 'unfaceted', 'unfiltered']
+  )) {
     try {
-      const hint = cts.doc(uri).toObject();
-      // Hint doc IS the full schema definition — no analysis re-read needed
+      const hint = doc.toObject();
       if (!hint || !hint.type) {
-        xdmp.log('[schema] skipping derive hint at ' + uri + ' — missing type field (may need re-derive)', 'warning');
+        xdmp.log('[schema] skipping derive hint — missing type field', 'warning');
         continue;
       }
-      if (!stored[hint.type]) {
-        derived[hint.type] = hint;
-        xdmp.log('[schema] loaded derived type: ' + hint.type + ' (' + Object.keys(hint.fields || {}).length + ' fields)', 'debug');
-        // Register any nested types that were derived alongside the root type
-        for (const [nestedName, nestedDef] of Object.entries(hint.nestedTypes || {})) {
-          if (!stored[nestedName] && !derived[nestedName]) {
-            derived[nestedName] = nestedDef;
-            xdmp.log('[schema] loaded nested derived type: ' + nestedName + ' (' + Object.keys(nestedDef.fields || {}).length + ' fields)', 'debug');
-          }
+      if (stored[hint.type] || (hint.collection && storedCollections.has(hint.collection))) {
+        xdmp.log('[schema] skipping derived type ' + hint.type + ' — overridden by stored schema', 'fine');
+        continue;
+      }
+      derived[hint.type] = hint;
+      xdmp.log('[schema] loaded derived type: ' + hint.type + ' (' + Object.keys(hint.fields || {}).length + ' fields)', 'fine');
+      for (const [nestedName, nestedDef] of Object.entries(hint.nestedTypes || {})) {
+        if (!stored[nestedName] && !derived[nestedName]) {
+          derived[nestedName] = nestedDef;
         }
-      } else {
-        xdmp.log('[schema] skipping derived type ' + hint.type + ' — overridden by stored schema', 'debug');
       }
     } catch (e) {
-      xdmp.log('[schema] error processing derive hint ' + uri + ': ' + e.message, 'error');
+      xdmp.log('[schema] error processing derive hint: ' + e.message, 'error');
     }
   }
-  xdmp.log('[schema] derive hint URIs found: ' + JSON.stringify(deriveUris), 'debug');
 
+  // stored takes precedence over derived
   const types = Object.assign({}, derived, stored);
   xdmp.log('[schema] total types in registry: ' + JSON.stringify(Object.keys(types)), 'debug');
 
-  // Build root Query fields: one field per type (plural, camelCase)
+  // Build root Query fields — skip embedded-only types (collection: null)
   const queryFields = {};
   for (const [typeName, typeDef] of Object.entries(types)) {
-    const fieldName = _toCamelCase(typeName) + 's'; // Order → orders
-    queryFields[fieldName] = {
+    if (!typeDef.collection) continue;
+    const singular = _toCamelCase(typeName);
+    // Avoid double-pluralising types that already end in 's' (e.g. "Orders" → "orders", not "orderss")
+    const plural   = singular.endsWith('s') ? singular : singular + 's';
+    queryFields[plural] = {
       type:       `[${typeName}]`,
       collection: typeDef.collection,
       format:     typeDef.format || 'json',
     };
-    // Also allow singular by typeName (camelCase)
-    queryFields[_toCamelCase(typeName)] = {
+    queryFields[singular] = {
       type:       typeName,
       collection: typeDef.collection,
       format:     typeDef.format || 'json',
@@ -375,7 +424,9 @@ function loadRegistry() {
   }
   xdmp.log('[schema] queryFields available: ' + JSON.stringify(Object.keys(queryFields)), 'debug');
 
-  return { types, queryFields };
+  const registry = { types, queryFields };
+  try { xdmp.setServerField(REGISTRY_CACHE_KEY, registry); } catch (e) { /* non-fatal */ }
+  return registry;
 }
 
 // ---------------------------------------------------------------------------
@@ -387,6 +438,14 @@ function loadRegistry() {
  * Covers __schema, __type, __Field, __InputValue, __EnumValue, __TypeKind.
  */
 function buildIntrospectionSchema(registry) {
+  try {
+    const cached = xdmp.getServerField(INTROSPECTION_CACHE_KEY);
+    if (cached !== null && cached !== undefined) {
+      const schema = (typeof cached.toObject === 'function') ? cached.toObject() : cached;
+      if (schema && schema.types) return schema;
+    }
+  } catch (e) { /* fall through */ }
+
   const { types } = registry;
 
   const builtinScalars = ['String', 'Int', 'Float', 'Boolean', 'ID'];
@@ -418,7 +477,7 @@ function buildIntrospectionSchema(registry) {
   // Add built-in introspection types
   _addIntrospectionMetaTypes(allTypes);
 
-  return {
+  const introSchema = {
     queryType: { name: 'Query' },
     mutationType: null,
     subscriptionType: null,
@@ -429,6 +488,8 @@ function buildIntrospectionSchema(registry) {
       { name:'deprecated', locations:['FIELD_DEFINITION','ENUM_VALUE'], args:[ {name:'reason', type:{kind:'SCALAR',name:'String'}, defaultValue:'No longer supported'} ] },
     ]
   };
+  try { xdmp.setServerField(INTROSPECTION_CACHE_KEY, introSchema); } catch (e) { /* non-fatal */ }
+  return introSchema;
 }
 
 function _introspectField(name, typeStr, args) {
@@ -562,4 +623,4 @@ function _xpathToSourceKey(xpath, rootTypeName) {
   return pathParts.join('.');
 }
 
-module.exports = { loadRegistry, deriveFromAnalysis, buildIntrospectionSchema, ML_TYPE_TO_GQL };
+module.exports = { loadRegistry, deriveFromAnalysis, buildIntrospectionSchema, invalidateRegistryCache, ML_TYPE_TO_GQL };

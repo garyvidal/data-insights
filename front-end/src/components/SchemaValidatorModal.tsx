@@ -1,5 +1,6 @@
 import { useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
+import { tokyoNight } from "@uiw/codemirror-theme-tokyo-night";
 import { json } from "@codemirror/lang-json";
 import { xml } from "@codemirror/lang-xml";
 import { useTheme } from "../context/ThemeContext";
@@ -95,7 +96,7 @@ export function SchemaValidatorModal({
                 value={documentContent}
                 onChange={setDocumentContent}
                 extensions={extensions}
-                theme={theme === "dark" ? "dark" : "light"}
+                theme={theme === "dark" ? tokyoNight : "light"}
                 placeholder={documentType === "json" ? '{\n  "key": "value"\n}' : "<root>\n  <element/>\n</root>"}
                 basicSetup={{
                   lineNumbers: true,

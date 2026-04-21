@@ -522,6 +522,12 @@ public class MarkLogicService {
         return postJson("/v1/resources/graphql", body);
     }
 
+    public void graphQLDelete(Map<String, String> params) {
+        Map<String, String> mlParams = new LinkedHashMap<>();
+        params.forEach((k, v) -> mlParams.put("rs:" + k, v));
+        delete("/v1/resources/graphql", mlParams);
+    }
+
     // ── Notifications ─────────────────────────────────────────────────────────
 
     public Map<String, Object> getNotificationResult() {
